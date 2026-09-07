@@ -17,6 +17,22 @@
 
 Engineered specifically to deliver enterprise-grade performance on single-board computers (like **Raspberry Pi 2/3/4/5, Pi Zero 2W, or mini-PCs**), BlockyDNS Hub delivers sub-millisecond query responses, native DoH/DoT encryption, live threat telemetry, domain-specific geo-bypass routing, and seamless AdGuard/ABP rule compatibility.
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="BlockyDNS Hub Modern Cyberpunk Dashboard" width="92%" style="border-radius: 8px;">
+</p>
+
+---
+
+## 📸 Visual Tour & Screenshots
+
+| Modern Dark Cyberpunk Dashboard | Live Query Log & Threat Telemetry |
+| :---: | :---: |
+| <img src="docs/screenshots/dashboard.png" width="100%" alt="Dashboard"> | <img src="docs/screenshots/query-log.png" width="100%" alt="Query Log"> |
+| **Domain Geo-Bypass & Latency Routing** | **AdGuard / ABP Custom Rules Engine** |
+| <img src="docs/screenshots/domain-routing.png" width="100%" alt="Domain Routing"> | <img src="docs/screenshots/rules-management.png" width="100%" alt="Rules Management"> |
+| **Homelab Local DNS & Reverse Records** | **1-Click Deep WHOIS & Threat Intel** |
+| <img src="docs/screenshots/local-dns.png" width="100%" alt="Local DNS"> | <img src="docs/screenshots/whois-threat-telemetry.png" width="100%" alt="WHOIS Intel"> |
+
 ---
 
 ## ⚖️ How Does It Compare to AdGuard Home & Pi-hole?
