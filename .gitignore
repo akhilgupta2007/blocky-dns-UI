@@ -1,0 +1,32 @@
+# SQLite Database & Write-Ahead Logs
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*_corrupt_*
+data/*.txt
+!data/.gitkeep
+
+# Runtime generated configs
+config/config.yml
+!config/config.example.yml
+
+# TLS Certificates & Private Keys
+certs/*.pem
+certs/*.key
+certs/*.crt
+!certs/.gitkeep
+
+# Environment and secrets
+.env
+
+# Python bytecode and caches
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

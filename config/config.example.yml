@@ -1,0 +1,50 @@
+# Blocky DNS Engine Configuration Template (Reference)
+upstreams:
+  groups:
+    default:
+      - https://1.1.1.1/dns-query
+      - tcp-tls:1.1.1.1:853
+      - https://dns.quad9.net/dns-query
+      - tcp-tls:9.9.9.9:853
+  strategy: parallel_best
+  timeout: 2s
+
+customDNS:
+  customTTL: 1h
+  mapping:
+    nas.home: 192.168.1.50
+    router.lan: 192.168.1.1
+
+conditional:
+  fallbackUpstream: true
+  mapping:
+    168.192.in-addr.arpa: 192.168.1.1
+    bbc.co.uk: https://uk.dns.mullvad.net/dns-query
+
+blocking:
+  blackLists:
+    ads:
+      - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+      - https://v.firebog.net/hosts/AdguardDNS.txt
+  whiteLists:
+    ads:
+      - s.youtube.com
+      - apple-pay.com
+  clientGroupsBlock:
+    default:
+      - ads
+  blockType: zeroIp
+  refreshPeriod: 4h
+
+queryLog:
+  type: sqlite
+  target: /app/data/blockydns.db
+  logRetentionDays: 7
+
+ports:
+  dns: 53
+  http: 4000
+
+prometheus:
+  enable: true
+  path: /metrics

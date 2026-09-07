@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - BlockyDNS Hub</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, rgba(16, 185, 129, 0.08) 0%, transparent 60%), #0a0e17;
+      padding: 20px;
+    }
+    .auth-container {
+      width: 100%;
+      max-width: 920px;
+      background: rgba(15, 21, 35, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 25px 60px -15px rgba(0,0,0,0.8), 0 0 2px 1px var(--border-glass);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+    @media (max-width: 800px) {
+      .auth-container {
+        grid-template-columns: 1fr;
+        max-width: 440px;
+      }
+      .auth-info-panel {
+        display: none;
+      }
+    }
+    .auth-form-panel {
+      padding: 44px 36px;
+    }
+    .auth-info-panel {
+      padding: 44px 36px;
+      background: rgba(19, 27, 46, 0.5);
+      border-left: 1px solid var(--border-glass);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .brand-large {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .brand-large .brand-icon {
+      width: 46px;
+      height: 46px;
+      font-size: 24px;
+    }
+    .wizard-card {
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      background: var(--bg-card);
+    }
+    .wizard-card:hover {
+      border-color: rgba(255,255,255,0.2);
+    }
+    .wizard-card.selected {
+      border-color: var(--accent-green);
+      background: rgba(16, 185, 129, 0.1);
+      box-shadow: 0 0 15px -3px var(--accent-green-glow);
+    }
+    .wizard-card h4 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .badge-recom {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-weight: 600;
+    }
+    .wizard-card p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .security-notice {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid var(--border-cyan);
+      border-radius: var(--radius-md);
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-container" id="authBox">
+    <!-- Left: Login / Setup Form -->
+    <div class="auth-form-panel">
+      <div class="brand-large">
+        <div class="brand-icon">🛡️</div>
+        <div class="brand-text">
+          <h2 style="font-size: 1.35rem;">BlockyDNS Hub</h2>
+          <span style="letter-spacing: 0.1em;">Secure DNS Manager</span>
+        </div>
+      </div>
+
+      <div id="setupHeader" style="display: none; margin-bottom: 24px;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 6px;">Initial System Setup</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Create your primary administrator credentials to secure the server.</p>
+      </div>
+
+      <div id="loginHeader" style="margin-bottom: 24px;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 6px;">Administrator Sign In</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Enter your credentials to access the DNS management dashboard.</p>
+      </div>
+
+      <form id="authForm" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input type="text" id="username" class="form-input" placeholder="admin" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" class="form-input" placeholder="••••••••••••" required autocomplete="current-password">
+        </div>
+
+        <div id="confirmPasswordGroup" class="form-group" style="display: none;">
+          <label class="form-label" for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" class="form-input" placeholder="••••••••••••" autocomplete="new-password">
+        </div>
+
+        <div id="existingBlockyFields" style="display: none;">
+          <div class="form-group">
+            <label class="form-label" for="blockyApiUrl">Blocky API URL</label>
+            <input type="text" id="blockyApiUrl" class="form-input" value="http://localhost:4000">
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; margin-top: 14px; padding: 12px;">
+          Sign In to Dashboard
+        </button>
+      </form>
+
+      <div id="authError" style="display: none; margin-top: 16px; padding: 10px; background: var(--accent-red-glow); border: 1px solid var(--accent-red); border-radius: var(--radius-sm); color: var(--accent-red); font-size: 0.85rem; text-align: center;">
+      </div>
+    </div>
+
+    <!-- Right: Architecture & Setup Wizard Info -->
+    <div class="auth-info-panel">
+      <div>
+        <h4 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 16px;">Integration Architecture</h4>
+
+        <div id="wizardCardAllInOne" class="wizard-card selected" onclick="selectIntegrationMode('all-in-one')">
+          <h4>All-in-One Docker Install (1-Go) <span class="badge-recom">Recommended</span></h4>
+          <p>Installs and manages the Blocky DNS engine, fast database logging, and web UI together in one unified container network.</p>
+        </div>
+
+        <div id="wizardCardExisting" class="wizard-card" onclick="selectIntegrationMode('existing')">
+          <h4>Connect Existing Blocky Instance</h4>
+          <p>Integrates with an already running Blocky server (bare-metal binary, remote host, or existing container) via REST API.</p>
+        </div>
+      </div>
+
+      <div class="security-notice">
+        <span>🔒</span>
+        <span>End-to-end TLS 1.3 encryption active. All credentials and query telemetry are shielded against packet capture attacks.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/js/auth.js"></script>
+</body>
+</html>

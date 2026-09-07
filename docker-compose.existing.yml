@@ -1,0 +1,27 @@
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blockydns-hub
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # HTTP Redirect
+      - "3443:3443"   # HTTPS Secured UI
+    environment:
+      - INTEGRATION_MODE=existing
+      - BLOCKY_API_URL=${BLOCKY_API_URL:-http://host.docker.internal:4000}
+      - BLOCKY_CONFIG_PATH=${BLOCKY_CONFIG_PATH:-/app/config/config.yml}
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - DATA_DIR=/app/data
+      - CERTS_DIR=/app/certs
+      - HTTP_PORT=3000
+      - HTTPS_PORT=3443
+      - ENABLE_HTTPS=true
+      - JWT_SECRET=super_secret_blockydns_jwt_key_change_me
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./certs:/app/certs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
