@@ -865,4 +865,250 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
   cursor: progress !important;
 }
 
+/* ==========================================================
+   MOBILE & RESPONSIVE DESIGN SYSTEM
+   ========================================================== */
+
+/* Mobile menu toggle & drawer close buttons (Hidden on desktop) */
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-accent);
+}
+
+.sidebar-close-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Off-canvas mobile backdrop overlay */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Tablet & Mobile Layout Breakpoint (< 860px) */
+@media (max-width: 860px) {
+  .app-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  /* Off-canvas slide-out navigation drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 275px;
+    max-width: 85vw;
+    z-index: 999;
+    background: #0f1523;
+    border-right: 1px solid var(--border-glass);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, 0.9);
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .main-wrapper {
+    width: 100vw;
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Compact Mobile Header */
+  .top-header {
+    height: 56px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .header-left {
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .status-badge {
+    padding: 4px 10px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
+  .ssl-badge {
+    display: none; /* Hide on mobile to protect action button space */
+  }
+
+  .header-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .header-action-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  .header-action-btn .btn-text {
+    display: none; /* Show icons only on mobile header */
+  }
+
+  /* Compact Content Scrolling Container */
+  .content-scrollable {
+    padding: 14px 10px;
+  }
+
+  /* Responsive 2-Column KPI Cards */
+  .grid-kpi {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .kpi-card {
+    padding: 12px 10px;
+  }
+
+  .kpi-card h3 {
+    font-size: 0.72rem;
+  }
+
+  .kpi-card .kpi-value {
+    font-size: 1.3rem;
+  }
+
+  .card {
+    padding: 14px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Dashboard Charts & Split Grids */
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* Tables Mobile Touch-Scroll */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+  }
+
+  table.modern-table {
+    min-width: 620px; /* Preserve columns with smooth swipe on touch screens */
+  }
+
+  /* Filter Bars Responsive Wrap */
+  .filter-bar {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .search-box {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .form-select, .filter-bar select {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 120px !important;
+    width: auto !important;
+  }
+
+  /* Modals Fullscreen Friendly */
+  .modal-content {
+    width: 95vw;
+    max-width: 95vw;
+    padding: 18px 14px;
+    margin: 10px auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Toast position on mobile */
+  .toast-container {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .toast {
+    width: 100%;
+  }
+}
+
+/* Small Smartphone Breakpoint (< 480px) */
+@media (max-width: 480px) {
+  .grid-kpi {
+    grid-template-columns: 1fr;
+  }
+
+  .card-title {
+    font-size: 0.95rem;
+  }
+
+  .filter-bar select {
+    flex: 1 1 100% !important;
+  }
+}
+
 

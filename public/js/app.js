@@ -56,6 +56,7 @@ async function apiRequest(endpoint, options = {}) {
     });
 
     if (res.status === 401) {
+      document.cookie = "blockydns_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       window.location.href = "/login";
       return null;
     }
@@ -91,8 +92,26 @@ function showToast(message, type = "success") {
   }, 3500);
 }
 
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (sidebar) sidebar.classList.toggle("mobile-open");
+  if (backdrop) backdrop.classList.toggle("active");
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (sidebar) sidebar.classList.remove("mobile-open");
+  if (backdrop) backdrop.classList.remove("active");
+}
+
+window.toggleMobileSidebar = toggleMobileSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
 function switchView(viewName) {
   currentView = viewName;
+  closeMobileSidebar();
 
   // Update Nav items
   document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
@@ -180,11 +199,16 @@ document.addEventListener("DOMContentLoaded", () => {
     .then(r => r.json())
     .then(d => {
       if (!d.authenticated) {
+        document.cookie = "blockydns_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         window.location.href = "/login";
       } else if (d.user) {
         const userEl = document.getElementById("sidebarUsername");
         if (userEl) userEl.textContent = d.user;
       }
+    })
+    .catch(() => {
+      document.cookie = "blockydns_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      window.location.href = "/login";
     });
 
   // Initial load

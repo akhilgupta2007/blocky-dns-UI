@@ -32,20 +32,13 @@ def create_access_token(username: str, request: Request = None) -> str:
     payload = {
         "sub": username,
         "iat": datetime.datetime.now(datetime.timezone.utc),
-        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRATION_HOURS),
-        "ua": get_ua_fingerprint(request) if request else None
+        "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRATION_HOURS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def decode_access_token(token: str, request: Request = None):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        # Verify User-Agent fingerprint if present
-        if request and payload.get("ua"):
-            current_ua = get_ua_fingerprint(request)
-            if payload["ua"] != current_ua:
-                print(f"[AUTH] User-Agent mismatch detected! Session rejected.")
-                return None
         return payload.get("sub")
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None

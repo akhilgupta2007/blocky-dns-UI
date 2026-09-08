@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BlockyDNS Hub - Homelab DNS Manager</title>
-  <link rel="stylesheet" href="/css/style.css?v=8">
+  <link rel="stylesheet" href="/css/style.css?v=9">
 </head>
 <body>
 
@@ -17,6 +17,7 @@
           <h2>BlockyDNS Hub</h2>
           <span>Homelab DNS</span>
         </div>
+        <button class="sidebar-close-btn" onclick="closeMobileSidebar()" aria-label="Close navigation" title="Close Menu">✕</button>
       </div>
 
       <nav class="nav-menu">
@@ -79,11 +80,17 @@
       </div>
     </aside>
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
     <!-- Main Content Area -->
     <div class="main-wrapper">
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open Navigation" title="Menu">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
           <div id="blockingStatusBadge" class="status-badge">
             <div class="pulse-dot"></div>
             <span id="blockingStatusText">Blocking Active</span>
@@ -95,14 +102,14 @@
         </div>
 
         <div class="header-actions">
-          <button id="btnPause5m" class="btn btn-secondary btn-sm" onclick="pauseBlockingPrompt()">
-            ⏸️ Pause Blocking
+          <button id="btnPause5m" class="btn btn-secondary btn-sm header-action-btn" onclick="pauseBlockingPrompt()" title="Pause Blocking">
+            <span class="btn-icon">⏸️</span><span class="btn-text"> Pause Blocking</span>
           </button>
-          <button id="btnRefreshAll" class="btn btn-cyan btn-sm" onclick="triggerListRefresh()">
-            🔄 Refresh Lists
+          <button id="btnRefreshAll" class="btn btn-cyan btn-sm header-action-btn" onclick="triggerListRefresh()" title="Refresh Lists">
+            <span class="btn-icon">🔄</span><span class="btn-text"> Refresh Lists</span>
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="openPasswordModal()" title="Change Admin Password">
-            🔑 Change Password
+          <button class="btn btn-secondary btn-sm header-action-btn" onclick="openPasswordModal()" title="Change Admin Password">
+            <span class="btn-icon">🔑</span><span class="btn-text"> Change Password</span>
           </button>
         </div>
       </header>
@@ -1104,7 +1111,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="/js/app.js?v=16"></script>
+  <script src="/js/app.js?v=17"></script>
   <script src="/js/dashboard.js?v=16"></script>
   <script src="/js/queryLog.js?v=16"></script>
   <script src="/js/blocklists.js?v=16"></script>
