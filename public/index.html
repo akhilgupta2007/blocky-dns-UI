@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BlockyDNS Hub - Homelab DNS Manager</title>
-  <link rel="stylesheet" href="/css/style.css?v=9">
+  <link rel="stylesheet" href="/css/style.css?v=12">
 </head>
 <body>
 
@@ -29,14 +29,10 @@
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
           Query Log
         </a>
-        <a id="navBlocklists" class="nav-item" onclick="switchView('blocklists')">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
-          Blocklists & Filters
-        </a>
-        <a id="navBlockedServices" class="nav-item" onclick="switchView('blockedServices')" style="display: flex; align-items: center; justify-content: space-between;">
+        <a id="navProtection" class="nav-item" onclick="switchView('protection')" style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-            <span>Blocked Services</span>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+            <span>Protection & Filters</span>
           </div>
           <span id="blockedServicesNavBadge" class="badge" style="font-size: 0.7rem; padding: 2px 6px; background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 10px; display: none;">0</span>
         </a>
@@ -44,21 +40,13 @@
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
           Client Devices
         </a>
-        <a id="navLocalDns" class="nav-item" onclick="switchView('localDns')">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
-          Local DNS & Wildcards
-        </a>
         <a id="navRouting" class="nav-item" onclick="switchView('routing')">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Geo-Bypass Routing
-        </a>
-        <a id="navTools" class="nav-item" onclick="switchView('tools')">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-          Homelab Tools
+          DNS Routing
         </a>
         <a id="navSettings" class="nav-item" onclick="switchView('settings')">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-          Settings & Upstreams
+          Settings & Tools
         </a>
       </nav>
 
@@ -117,8 +105,31 @@
       <!-- Scrollable Content Views -->
       <main class="content-scrollable">
 
-        <!-- 1. DASHBOARD VIEW -->
+        <!-- 1. DASHBOARD VIEW (COMMAND CENTER) -->
         <section id="viewDashboard" class="view-section active">
+          <!-- Dashboard Action Bar: Pause Protection & Live Shield Status -->
+          <div class="dashboard-action-bar">
+            <div class="protection-status-box">
+              <span id="shieldStatusDot" class="shield-pulse-dot"></span>
+              <span id="shieldStatusText" class="shield-status-text">Shield Active</span>
+              <span id="pauseCountdownBadge" class="pill pause-countdown-pill" style="display: none;"></span>
+              <button id="btnResumeProtection" type="button" class="btn btn-resume" onclick="handleResumeBlocking()" style="display: none;">
+                ▶ Resume Protection
+              </button>
+            </div>
+
+            <div class="pause-controls-group">
+              <span class="pause-label">Pause Protection:</span>
+              <div class="pause-buttons-pill">
+                <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('1m')" title="Pause DNS blocking for 1 minute">1 min</button>
+                <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('10m')" title="Pause DNS blocking for 10 minutes">10 min</button>
+                <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('30m')" title="Pause DNS blocking for 30 minutes">30 min</button>
+                <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('1h')" title="Pause DNS blocking for 1 hour">1 hour</button>
+                <button type="button" class="btn-pause-pill pause-indefinitely" onclick="handlePauseBlocking('permanent')" title="Pause DNS blocking indefinitely until manually resumed">Permanently</button>
+              </div>
+            </div>
+          </div>
+
           <!-- KPI Cards -->
           <div class="grid-kpi">
             <div class="card kpi-card green" onclick="viewAllQueries()" style="cursor: pointer;" title="View all queries in Query Log">
@@ -161,52 +172,68 @@
             </div>
           </div>
 
-          <!-- Charts and Top Sections -->
-          <div class="dashboard-main-grid">
+          <!-- Telemetry Grid: 24h Area Traffic + Donut Query Breakdown -->
+          <div class="dashboard-telemetry-grid">
             <div class="card">
               <div class="card-title">
                 <span>24-Hour Query Volume</span>
                 <span style="font-size: 0.8rem; color: var(--text-muted);">
-                  <span style="color: var(--accent-violet);">● Total</span> &nbsp;
-                  <span style="color: var(--accent-green);">● Blocked</span>
+                  <span style="color: var(--accent-cyan);">● Total</span> &nbsp;
+                  <span style="color: var(--accent-red);">● Blocked</span>
                 </span>
               </div>
               <div class="canvas-container">
-                <canvas id="timelineChart" width="700" height="220"></canvas>
+                <canvas id="timelineChart" style="width: 100%; height: 220px; display: block;"></canvas>
               </div>
             </div>
 
             <div class="card">
               <div class="card-title">
+                <span>Query Breakdown (24h)</span>
+                <span class="pill" style="font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim);">Live Telemetry</span>
+              </div>
+              <div class="donut-chart-wrapper" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 220px;">
+                <canvas id="queryDonutChart" style="width: 135px; height: 135px; max-width: 135px; max-height: 135px; display: block;"></canvas>
+                <div id="donutLegend" class="donut-legend-grid">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Grid: Top Blocked Domains + Client Device Breakdown -->
+          <div class="dashboard-bottom-grid">
+            <div class="card">
+              <div class="card-title">
                 <span>Top Blocked Domains</span>
+                <span class="pill blocked" style="font-size: 0.72rem;">Last 24h</span>
               </div>
               <div id="topBlockedList" style="display: flex; flex-direction: column; gap: 10px;">
                 <!-- Populated by JS -->
               </div>
             </div>
-          </div>
 
-          <!-- Device Breakdown Table -->
-          <div class="card">
-            <div class="card-title">
-              <span>Client Device Activity Breakdown</span>
-              <button class="btn btn-secondary btn-sm" onclick="switchView('devices')">Manage Devices</button>
-            </div>
-            <div class="table-responsive">
-              <table class="modern-table">
-                <thead>
-                  <tr>
-                    <th>Device / Hostname</th>
-                    <th>IP Address</th>
-                    <th>Total Queries</th>
-                    <th>Blocked Queries</th>
-                    <th>Blocked %</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboardDevicesTable">
-                  <!-- Populated by JS -->
-                </tbody>
-              </table>
+            <div class="card">
+              <div class="card-title">
+                <span>Client Device Activity Breakdown</span>
+                <button class="btn btn-secondary btn-sm" onclick="switchView('devices')">Manage Devices</button>
+              </div>
+              <div class="table-responsive">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Device / Hostname</th>
+                      <th>IP Address</th>
+                      <th>Total Queries</th>
+                      <th>Blocked Queries</th>
+                      <th>Blocked %</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboardDevicesTable">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -223,11 +250,12 @@
               <option value="">All Devices</option>
             </select>
 
-            <select id="logStatusSelect" class="form-select" style="width: 150px;" onchange="handleLogFilterChange()">
+            <select id="logStatusSelect" class="form-select" style="width: 165px;" onchange="handleLogFilterChange()">
               <option value="ALL">All Statuses</option>
               <option value="BLOCKED">Blocked Only</option>
               <option value="RESOLVED">Resolved Only</option>
               <option value="CACHED">Cached Only</option>
+              <option value="CONDITIONAL">Custom Routed Only</option>
             </select>
 
             <select id="logDateRangeSelect" class="form-select" style="width: 165px;" onchange="handleDateRangeChange()">
@@ -295,12 +323,30 @@
         </section>
 
         <!-- 3. BLOCKLISTS & FILTERS VIEW -->
-        <section id="viewBlocklists" class="view-section">
-          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px;">
-            <!-- Left: Curated Catalog & Custom Adlists -->
+        <!-- 3. PROTECTION & FILTERS VIEW (UNIFIED HUB) -->
+        <section id="viewProtection" class="view-section">
+          <!-- Segmented Sub-Tab Switcher Bar -->
+          <div class="subnav-segmented-bar">
+            <button type="button" class="subnav-pill active" id="subtabBtnAdlists" onclick="switchProtectionSubTab('adlists')">
+              <span>🛡️</span> Blocklist Subscriptions
+            </button>
+            <button type="button" class="subnav-pill" id="subtabBtnCustomRules" onclick="switchProtectionSubTab('customRules')">
+              <span>📝</span> Custom Domain Rules
+            </button>
+            <button type="button" class="subnav-pill" id="subtabBtnBlockedServices" onclick="switchProtectionSubTab('blockedServices')">
+              <span>🚫</span> 1-Click Blocked Services
+              <span id="blockedServicesNavBadge" class="badge-mini" style="display: none;">0</span>
+            </button>
+          </div>
+
+          <!-- Subpane 1: Blocklist Subscriptions (Adlists) -->
+          <div id="subpaneAdlists" class="sub-pane active">
             <div class="card">
-              <div class="card-title">
-                <span>Blocklist Subscriptions (Adlists)</span>
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <span>Blocklist Subscriptions (Adlists)</span>
+                  <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">Curated DNS blocklists from world-renowned security maintainers</div>
+                </div>
                 <button class="btn btn-cyan btn-sm" onclick="triggerListRefresh()">🔄 Refresh Rules Now</button>
               </div>
 
@@ -309,14 +355,16 @@
               </div>
 
               <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Add Custom Blocklist URL</h4>
-              <form onsubmit="handleAddBlocklist(event)" style="display: flex; gap: 10px;">
+              <form onsubmit="handleAddBlocklist(event)" style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <input type="text" id="newListName" class="form-input" placeholder="List Name" required style="width: 140px;">
-                <input type="url" id="newListUrl" class="form-input" placeholder="https://example.com/hosts.txt" required style="flex: 1;">
+                <input type="url" id="newListUrl" class="form-input" placeholder="https://example.com/hosts.txt" required style="flex: 1; min-width: 220px;">
                 <button type="submit" class="btn btn-primary btn-sm">+ Add List</button>
               </form>
             </div>
+          </div>
 
-            <!-- Right: Custom Whitelist & Blacklist -->
+          <!-- Subpane 2: Custom Whitelist & Blacklist -->
+          <div id="subpaneCustomRules" class="sub-pane">
             <div class="card">
               <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -336,12 +384,12 @@
                 <input type="text" id="ruleSearchInput" class="form-input" placeholder="🔍 Search rules..." oninput="filterRulesList(this.value)" style="width: 170px; padding: 4px 10px; font-size: 0.8rem;">
               </div>
 
-              <form onsubmit="handleAddRule(event)" style="display: flex; gap: 8px; margin-bottom: 14px;">
-                <input type="text" id="newRuleDomain" class="form-input" placeholder="domain.com, *.wildcard, or ||adguard.rule^" required style="flex: 1;">
+              <form onsubmit="handleAddRule(event)" style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+                <input type="text" id="newRuleDomain" class="form-input" placeholder="domain.com, *.wildcard, or ||adguard.rule^" required style="flex: 1; min-width: 220px;">
                 <button type="submit" class="btn btn-primary btn-sm">+ Add Rule</button>
               </form>
 
-              <div class="table-responsive" style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
+              <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
                 <table class="modern-table" style="margin: 0;">
                   <thead>
                     <tr style="position: sticky; top: 0; background: var(--bg-card); z-index: 2;">
@@ -352,49 +400,49 @@
                     </tr>
                   </thead>
                   <tbody id="customRulesTableBody">
-                    <!-- Populated as a clean list by JS -->
+                    <!-- Populated by JS -->
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-        </section>
- 
-        <!-- 3.5 BLOCKED SERVICES VIEW -->
-        <section id="viewBlockedServices" class="view-section">
-          <div class="card" style="margin-bottom: 20px;">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <span>🚫 1-Click Blocked Services</span>
-                <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
-                  Instantly block popular platforms and apps across all household devices without manually managing domains.
+
+          <!-- Subpane 3: 1-Click Blocked Services -->
+          <div id="subpaneBlockedServices" class="sub-pane">
+            <div class="card" style="margin-bottom: 20px;">
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <span>🚫 1-Click Blocked Services</span>
+                  <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+                    Instantly block popular platforms and apps across all household devices without manually managing domains.
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <span id="servicesBlockedSummaryBadge" class="pill" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.82rem;">
+                    0 Services Blocked
+                  </span>
+                  <button class="btn btn-secondary btn-sm" onclick="handleBulkServices(true)">Block Category</button>
+                  <button class="btn btn-secondary btn-sm" onclick="handleBulkServices(false)">Unblock Category</button>
+                  <button class="btn btn-cyan btn-sm" onclick="loadBlockedServices()">🔄 Refresh</button>
                 </div>
               </div>
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <span id="servicesBlockedSummaryBadge" class="pill" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.82rem;">
-                  0 Services Blocked
-                </span>
-                <button class="btn btn-secondary btn-sm" onclick="handleBulkServices(true)">Block Category</button>
-                <button class="btn btn-secondary btn-sm" onclick="handleBulkServices(false)">Unblock Category</button>
-                <button class="btn btn-cyan btn-sm" onclick="loadBlockedServices()">🔄 Refresh</button>
+
+              <!-- Category Filter Pills -->
+              <div id="serviceCategoryPills" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+                <button class="btn btn-sm btn-primary category-pill active" data-cat="ALL" onclick="filterServicesCategory('ALL')">All Categories</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Social Media" onclick="filterServicesCategory('Social Media')">Social Media</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Video & Streaming" onclick="filterServicesCategory('Video & Streaming')">Video & Streaming</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Gaming" onclick="filterServicesCategory('Gaming')">Gaming</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Communication" onclick="filterServicesCategory('Communication')">Communication</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Shopping & Dating" onclick="filterServicesCategory('Shopping & Dating')">Shopping & Dating</button>
+                <button class="btn btn-sm btn-secondary category-pill" data-cat="Adult & Gambling" onclick="filterServicesCategory('Adult & Gambling')">Adult & Gambling</button>
               </div>
             </div>
 
-            <!-- Category Filter Pills -->
-            <div id="serviceCategoryPills" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
-              <button class="btn btn-sm btn-primary category-pill active" data-cat="ALL" onclick="filterServicesCategory('ALL')">All Categories</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Social Media" onclick="filterServicesCategory('Social Media')">Social Media</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Video & Streaming" onclick="filterServicesCategory('Video & Streaming')">Video & Streaming</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Gaming" onclick="filterServicesCategory('Gaming')">Gaming</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Communication" onclick="filterServicesCategory('Communication')">Communication</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Shopping & Dating" onclick="filterServicesCategory('Shopping & Dating')">Shopping & Dating</button>
-              <button class="btn btn-sm btn-secondary category-pill" data-cat="Adult & Gambling" onclick="filterServicesCategory('Adult & Gambling')">Adult & Gambling</button>
+            <!-- Services Grid -->
+            <div id="servicesGridContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px;">
+              <!-- Rendered dynamically by JS -->
             </div>
-          </div>
-
-          <!-- Services Grid -->
-          <div id="servicesGridContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px;">
-            <!-- Rendered dynamically by JS -->
           </div>
         </section>
 
@@ -432,254 +480,133 @@
           </div>
         </section>
 
-        <!-- 5. LOCAL DNS & WILDCARDS VIEW -->
-        <section id="viewLocalDns" class="view-section">
-          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
-            <div class="card">
-              <div class="card-title">
-                <span>Local DNS Records & Wildcard Proxy</span>
+        <!-- 5. DNS ROUTING VIEW (UNIFIED HUB) -->
+        <section id="viewRouting" class="view-section">
+          <!-- Segmented Sub-Tab Switcher Bar -->
+          <div class="subnav-segmented-bar">
+            <button type="button" class="subnav-pill active" id="subtabBtnLocalDns" onclick="switchRoutingSubTab('localDns')">
+              <span>🏠</span> Local DNS & Homelab
+            </button>
+            <button type="button" class="subnav-pill" id="subtabBtnSmartDns" onclick="switchRoutingSubTab('smartDns')">
+              <span>🌍</span> SmartDNS Geo-Bypass
+            </button>
+          </div>
+
+          <!-- Subpane 1: Local DNS & Wildcards -->
+          <div id="subpaneLocalDns" class="sub-pane active">
+            <div class="grid-responsive-2col">
+              <div class="card">
+                <div class="card-title">
+                  <span>Local DNS Records & Wildcard Proxy</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="modern-table">
+                    <thead>
+                      <tr>
+                        <th>Domain / Pattern</th>
+                        <th>IP Address</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="localDnsTableBody">
+                      <!-- Populated by JS -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              <div class="card">
+                <div class="card-title">
+                  <span>Add Local DNS Record</span>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Supports exact names (e.g. <code>nas.home</code>) and reverse-proxy wildcards (e.g. <code>*.lab.internal</code>) for Docker, Traefik, NPM, or Proxmox.
+                </p>
+                <form onsubmit="handleAddLocalDns(event)">
+                  <div class="form-group">
+                    <label class="form-label" for="localDomain">Local Domain (e.g. *.lab.internal or router.lan)</label>
+                    <input type="text" id="localDomain" class="form-input" placeholder="*.lab.internal" required>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="localIp">Target IP Address</label>
+                    <input type="text" id="localIp" class="form-input" placeholder="192.168.1.100" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="width: 100%;">Save Local DNS Record</button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subpane 2: SmartDNS Geo-Bypass -->
+          <div id="subpaneSmartDns" class="sub-pane">
+            <div class="card">
+              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <span>Domain-Specific Upstream Routing (Geo-Bypass & SmartDNS)</span>
+                <a onclick="switchView('settings')" class="btn btn-secondary btn-sm" style="cursor: pointer; text-decoration: none; font-size: 0.78rem;">⚙️ Upstream Settings</a>
+              </div>
+              <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 18px;">
+                Circumvent regional ISP blocks, court-ordered DNS poisoning, or unlock geo-restricted streaming by routing specific domains through international DoH/DoT or SmartDNS servers without slowing down your rest of network traffic.
+              </p>
+
+              <form onsubmit="handleAddRouting(event)" class="form-grid-routing" style="display: grid; grid-template-columns: 1fr 1.5fr 1fr 140px; gap: 12px; margin-bottom: 20px;">
+                <div>
+                  <label class="form-label">Domain Pattern</label>
+                  <input type="text" id="routingDomain" class="form-input" placeholder="bbc.co.uk or *.to" required>
+                </div>
+                <div>
+                  <label class="form-label">Custom Resolver (DoH / DoT / IP)</label>
+                  <input type="text" id="routingResolver" class="form-input" placeholder="https://uk.dns.mullvad.net/dns-query" required>
+                </div>
+                <div>
+                  <label class="form-label">Resolver Preset / Configured DNS</label>
+                  <select id="routingPresetSelect" class="form-select" onchange="applyRoutingPreset()">
+                    <option value="">-- Select Configured Resolver or Preset --</option>
+                  </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                  <button type="submit" class="btn btn-primary" style="width: 100%;">+ Route</button>
+                </div>
+              </form>
+
               <div class="table-responsive">
                 <table class="modern-table">
                   <thead>
                     <tr>
-                      <th>Domain / Pattern</th>
-                      <th>IP Address</th>
-                      <th>Type</th>
+                      <th>Domain Pattern</th>
+                      <th>Dedicated Resolver</th>
+                      <th>Purpose Tag</th>
+                      <th>Active</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
-                  <tbody id="localDnsTableBody">
+                  <tbody id="routingTableBody">
                     <!-- Populated by JS -->
                   </tbody>
                 </table>
               </div>
             </div>
-
-            <div class="card">
-              <div class="card-title">
-                <span>Add Local DNS Record</span>
-              </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-                Supports exact names (e.g. <code>nas.home</code>) and reverse-proxy wildcards (e.g. <code>*.lab.internal</code>) for Docker, Traefik, NPM, or Proxmox.
-              </p>
-              <form onsubmit="handleAddLocalDns(event)">
-                <div class="form-group">
-                  <label class="form-label" for="localDomain">Local Domain (e.g. *.lab.internal or router.lan)</label>
-                  <input type="text" id="localDomain" class="form-input" placeholder="*.lab.internal" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="localIp">Target IP Address</label>
-                  <input type="text" id="localIp" class="form-input" placeholder="192.168.1.100" required>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Save Local DNS Record</button>
-              </form>
-            </div>
           </div>
         </section>
 
-        <!-- 6. GEO-BYPASS ROUTING VIEW -->
-        <section id="viewRouting" class="view-section">
-          <!-- Active Routing Rules Card -->
-          <div class="card" style="margin-bottom: 20px;">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <span>Domain-Specific Upstream Routing (Geo-Bypass & SmartDNS)</span>
-              <a onclick="switchView('settings')" class="btn btn-secondary btn-sm" style="cursor: pointer; text-decoration: none; font-size: 0.78rem;">⚙️ Upstream Settings</a>
-            </div>
-            <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 18px;">
-              Circumvent regional ISP blocks, court-ordered DNS poisoning, or unlock geo-restricted streaming by routing specific domains through international DoH/DoT or SmartDNS servers without slowing down your rest of network traffic.
-            </p>
-
-            <form onsubmit="handleAddRouting(event)" style="display: grid; grid-template-columns: 1fr 1.5fr 1fr 140px; gap: 12px; margin-bottom: 20px;">
-              <div>
-                <label class="form-label">Domain Pattern</label>
-                <input type="text" id="routingDomain" class="form-input" placeholder="bbc.co.uk or *.to" required>
-              </div>
-              <div>
-                <label class="form-label">Custom Resolver (DoH / DoT / IP)</label>
-                <input type="text" id="routingResolver" class="form-input" placeholder="https://uk.dns.mullvad.net/dns-query" required>
-              </div>
-              <div>
-                <label class="form-label">Resolver Preset / Configured DNS</label>
-                <select id="routingPresetSelect" class="form-select" onchange="applyRoutingPreset()">
-                  <option value="">-- Select Configured Resolver or Preset --</option>
-                </select>
-              </div>
-              <div style="display: flex; align-items: flex-end;">
-                <button type="submit" class="btn btn-primary" style="width: 100%;">+ Route</button>
-              </div>
-            </form>
-
-            <div class="table-responsive">
-              <table class="modern-table">
-                <thead>
-                  <tr>
-                    <th>Domain Pattern</th>
-                    <th>Dedicated Resolver</th>
-                    <th>Purpose Tag</th>
-                    <th>Active</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="routingTableBody">
-                  <!-- Populated by JS -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Configured & Custom DNS Resolvers Catalog -->
-          <div class="card">
-            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span>🌐 Configured & Custom DNS Resolvers</span>
-                <span class="pill" id="routingResolversCount" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; font-size: 0.72rem;">0 Resolvers</span>
-              </div>
-              <button type="button" class="btn btn-cyan btn-sm" onclick="toggleAddCustomDnsForm()">+ Add Custom DNS</button>
-            </div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
-              All upstream DNS resolvers active in your hub. Click <strong>"Use in Route"</strong> to quickly target any domain traffic through that resolver.
-            </p>
-
-            <!-- Collapsible Quick Add Custom DNS Form -->
-            <div id="routingAddCustomDnsBox" style="display: none; background: var(--bg-input); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-glass); margin-bottom: 16px;">
-              <div style="font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; color: var(--text-main);">Add New Custom DNS Resolver</div>
-              <form onsubmit="handleAddRoutingCustomDns(event)" style="display: grid; grid-template-columns: 1fr 1.5fr 110px 110px; gap: 10px;">
-                <input type="text" id="quickDnsName" class="form-input" placeholder="Name (e.g. Yandex DNS)" required>
-                <input type="text" id="quickDnsEndpoint" class="form-input" placeholder="https://common.dot.dns.yandex.net/dns-query" required>
-                <select id="quickDnsProtocol" class="form-select">
-                  <option value="doh">DoH</option>
-                  <option value="dot">DoT</option>
-                  <option value="udp">UDP</option>
-                </select>
-                <button type="submit" class="btn btn-primary btn-sm">+ Save DNS</button>
-              </form>
-            </div>
-
-            <div class="table-responsive">
-              <table class="modern-table">
-                <thead>
-                  <tr>
-                    <th>Resolver Name</th>
-                    <th>Endpoint / URL</th>
-                    <th>Protocol</th>
-                    <th>Latency</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th style="text-align: right;">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="routingUpstreamsTableBody">
-                  <!-- Populated by JS -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- 7. HOMELAB TOOLS VIEW -->
-        <section id="viewTools" class="view-section">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <!-- Upstream Speed Benchmark -->
-            <div class="card">
-              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <span>🚀 Upstream Speed Latency Benchmark</span>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <div style="display: flex; align-items: center; gap: 6px;" title="Automatic background benchmark interval">
-                    <span style="font-size: 0.78rem; color: var(--text-muted);">Auto-Benchmark:</span>
-                    <select id="selectAutoBenchmark" class="form-select" onchange="handleUpdateAutoBenchmark(this.value)" style="padding: 2px 6px; font-size: 0.78rem; width: auto; background: var(--bg-input); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); color: var(--text-main);">
-                      <option value="24">Daily (Every 24h)</option>
-                      <option value="12">Every 12 Hours</option>
-                      <option value="6">Every 6 Hours</option>
-                      <option value="0">Disabled (Manual Only)</option>
-                    </select>
-                  </div>
-                  <button id="btnRunBenchmark" class="btn btn-cyan btn-sm" onclick="runBenchmark()">Run Benchmark</button>
-                </div>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">
-                  Tests real-time round-trip latency across all active upstream resolvers.
-                </p>
-                <span id="lastBenchmarkTime" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: monospace;"></span>
-              </div>
-              <div id="benchmarkResultsContainer" style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 20px;">
-                  Click "Run Benchmark" to test latency across DoH & DoT providers.
-                </div>
-              </div>
-            </div>
-
-            <!-- Interactive DNS Diagnostic -->
-            <div class="card">
-              <div class="card-title">
-                <span>🔍 Interactive DNS Query Diagnostic ("Web Dig")</span>
-              </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-                Inspect domain resolution, rule matching (blocked vs allowed), and response latency.
-              </p>
-              <form onsubmit="handleDiagnostic(event)" style="display: flex; gap: 10px; margin-bottom: 16px;">
-                <input type="text" id="diagnosticDomain" class="form-input" placeholder="e.g. tracking.adservice.google.com" required style="flex: 1;">
-                <button type="submit" class="btn btn-primary btn-sm">Test Domain</button>
-              </form>
-
-              <div id="diagnosticResultBox" style="display: none; padding: 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
-                <!-- Diagnostic details populated by JS -->
-              </div>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <!-- Rebinding Shield -->
-            <div class="card">
-              <div class="card-title">
-                <span>🛡️ DNS Rebinding Protection Shield</span>
-                <label class="switch">
-                  <input type="checkbox" id="toggleRebindingShield" onchange="handleToggleRebinding(this)">
-                  <span class="slider"></span>
-                </label>
-              </div>
-              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-                Blocks public WAN queries that resolve to private RFC-1918 IPs (<code>192.168.x.x</code>, <code>10.x.x.x</code>, <code>127.0.0.1</code>), neutralizing DNS rebinding attacks against internal smart home and IoT hardware.
-              </p>
-            </div>
-
-            <!-- TLS Info -->
-            <div class="card">
-              <div class="card-title">
-                <span>🔒 HTTPS / TLS Certificate Status</span>
-              </div>
-              <div id="tlsInfoBox" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
-                Loading TLS certificate information...
-              </div>
-            </div>
-          </div>
-
-          <!-- DNSSEC Cryptographic Inspector -->
-          <div class="card" style="margin-top: 20px;">
-            <div class="card-title">
-              <span>🔐 DNSSEC Cryptographic Chain-of-Trust Inspector</span>
-            </div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-              Verify public DNSKEYs, DS delegation records at parent TLDs, and RRSIG resource signatures in real time to guarantee cryptographic authenticity.
-            </p>
-            <form onsubmit="handleDnssecInspect(event)" style="display: flex; gap: 10px; margin-bottom: 16px;">
-              <input type="text" id="dnssecInspectDomain" class="form-input" placeholder="e.g. cloudflare.com, ietf.org, or icann.org" required style="flex: 1;">
-              <button type="submit" id="btnDnssecInspect" class="btn btn-cyan btn-sm">Inspect Chain of Trust</button>
-            </form>
-            <div id="dnssecInspectResultBox" style="display: none; padding: 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-        </section>
-
-        <!-- 8. SETTINGS & UPSTREAMS VIEW -->
+        <!-- 6. SETTINGS & TOOLS VIEW (UNIFIED HUB) -->
         <section id="viewSettings" class="view-section">
-          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px;">
-            <!-- Left Column: Upstreams + Caching + DNSSEC -->
-            <div style="display: flex; flex-direction: column; gap: 20px;">
-              <!-- Upstreams -->
-              <div class="card">
+          <!-- Segmented Sub-Tab Switcher Bar -->
+          <div class="subnav-segmented-bar">
+            <button type="button" class="subnav-pill active" id="subtabBtnResolvers" onclick="switchSettingsSubTab('resolvers')">
+              <span>🌐</span> Upstream Resolvers
+            </button>
+            <button type="button" class="subnav-pill" id="subtabBtnEngine" onclick="switchSettingsSubTab('engine')">
+              <span>⚡</span> Engine Shield & Cache
+            </button>
+            <button type="button" class="subnav-pill" id="subtabBtnTools" onclick="switchSettingsSubTab('tools')">
+              <span>🔍</span> Diagnostics & Tools
+            </button>
+          </div>
+
+          <!-- Subpane 1: Upstream Encrypted Resolvers -->
+          <div id="subpaneResolvers" class="sub-pane active">
+            <div class="card">
               <div class="card-title">
                 <span>Upstream Encrypted DNS Resolvers</span>
                 <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
@@ -734,7 +661,7 @@
               </div>
 
               <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Add Custom DNS Resolver</h4>
-              <form onsubmit="handleAddUpstream(event)" style="display: grid; grid-template-columns: 1fr 1.5fr 100px 80px; gap: 10px;">
+              <form onsubmit="handleAddUpstream(event)" class="form-grid-upstream" style="display: grid; grid-template-columns: 1fr 1.5fr 100px 80px; gap: 10px;">
                 <input type="text" id="newUpstreamName" class="form-input" placeholder="Name" required>
                 <input type="text" id="newUpstreamEndpoint" class="form-input" placeholder="https://... or tcp-tls:..." required>
                 <select id="newUpstreamProtocol" class="form-select">
@@ -745,239 +672,342 @@
                 <button type="submit" class="btn btn-primary btn-sm">+ Add</button>
               </form>
             </div>
+          </div>
 
-            <!-- High-Speed Caching & Prefetching -->
-            <div class="card">
-              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span>⚡ Optimistic Caching & Prefetching</span>
-                  <span class="pill" style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);">Sub-millisecond RAM Cache</span>
-                </div>
-                <label class="switch" title="Enable In-Memory DNS Cache">
-                  <input type="checkbox" id="toggleCachingEnabled">
-                  <span class="slider"></span>
-                </label>
-              </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-                Stores resolved DNS queries directly in high-speed RAM. Repeated queries resolve in ~0.1ms without touching upstream resolvers.
-              </p>
+          <!-- Subpane 2: Engine Shield & Cache -->
+          <div id="subpaneEngine" class="sub-pane">
+            <div class="grid-responsive-2col">
+              <!-- Left Column: Blocky Engine + Caching + DNSSEC -->
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Blocky Engine Integration -->
+                <div class="card" id="cardBlockyIntegration">
+                  <div class="card-title">
+                    <span>🧩 Blocky Engine Integration</span>
+                    <span id="blockyIntegrationBadge" class="pill" style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">Checking...</span>
+                  </div>
+                  <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
+                    Configure whether BlockyDNS Hub manages the bundled Blocky container or connects to an existing Blocky server running elsewhere in your homelab.
+                  </p>
+                  <form onsubmit="handleSaveIntegration(event)">
+                    <div class="form-group">
+                      <label class="form-label">Deployment Architecture Mode</label>
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
+                        <label id="labelModeAllInOne" style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--accent-green); background: rgba(16, 185, 129, 0.08); border-radius: 8px; cursor: pointer;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" name="integrationModeRadio" value="all-in-one" checked onchange="toggleIntegrationModeUI()">
+                            <strong style="font-size: 0.85rem; color: var(--text-main);">All-in-One Engine</strong>
+                          </div>
+                          <span style="font-size: 0.74rem; color: var(--text-dim); margin-left: 24px;">Bundled container on internal bridge network (Default)</span>
+                        </label>
 
-              <form onsubmit="handleSaveCachingSettings(event)">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-                  <div class="form-group">
-                    <label class="form-label" for="settingCacheMinTtl">Min TTL (Seconds)</label>
-                    <input type="number" id="settingCacheMinTtl" class="form-input" min="0" max="86400" placeholder="300" required>
-                    <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Floor clamp for short records</span>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="settingCacheMaxTtl">Max TTL (Seconds)</label>
-                    <input type="number" id="settingCacheMaxTtl" class="form-input" min="300" max="604800" placeholder="86400" required>
-                    <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Cap ceiling for long records</span>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="settingCacheNegTtl">Negative TTL</label>
-                    <input type="number" id="settingCacheNegTtl" class="form-input" min="0" max="86400" placeholder="1800" required>
-                    <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">NXDOMAIN cache duration</span>
-                  </div>
-                </div>
-
-                <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div>
-                      <strong style="font-size: 0.88rem; color: var(--text-main);">Optimistic Cache Pre-fetching</strong>
-                      <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
-                        Silently refreshes popular domain records in the background before TTL expiry so clients never experience latency.
+                        <label id="labelModeExisting" style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border); background: var(--bg-card); border-radius: 8px; cursor: pointer;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" name="integrationModeRadio" value="existing" onchange="toggleIntegrationModeUI()">
+                            <strong style="font-size: 0.85rem; color: var(--text-main);">Existing Blocky Server</strong>
+                          </div>
+                          <span style="font-size: 0.74rem; color: var(--text-dim); margin-left: 24px;">Connect to remote Pi, host binary, or external container</span>
+                        </label>
                       </div>
                     </div>
-                    <label class="switch" title="Toggle Cache Prefetching">
-                      <input type="checkbox" id="togglePrefetchingEnabled">
+
+                    <div id="existingBlockyConfigFields" style="display: none; margin-top: 14px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px;">
+                      <div class="form-group">
+                        <label class="form-label" for="settingBlockyApiUrl">Blocky HTTP API Endpoint</label>
+                        <div style="display: flex; gap: 8px;">
+                          <input type="text" id="settingBlockyApiUrl" class="form-input" placeholder="http://192.168.1.50:4000" style="flex: 1;">
+                          <button type="button" class="btn btn-secondary" onclick="handleTestBlockyConnection()" id="btnTestBlocky">⚡ Test Connection</button>
+                        </div>
+                        <span style="font-size: 0.74rem; color: var(--text-dim); margin-top: 4px; display: block;">The base URL of the Blocky API (port 4000 by default).</span>
+                      </div>
+
+                      <div class="form-group" style="margin-top: 10px;">
+                        <label class="form-label" for="settingBlockyConfigPath">Blocky Config File Path (Optional)</label>
+                        <input type="text" id="settingBlockyConfigPath" class="form-input" placeholder="/app/config/config.yml">
+                        <span style="font-size: 0.74rem; color: var(--text-dim); margin-top: 4px; display: block;">Mount or path to config.yml for automated rule synchronization.</span>
+                      </div>
+
+                      <div id="blockyTestResult" style="display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; margin-top: 10px;"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="margin-top: 14px; width: 100%;">Save Integration Architecture</button>
+                  </form>
+                </div>
+
+                <!-- High-Speed Caching & Prefetching -->
+                <div class="card">
+                  <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span>⚡ Optimistic Caching & Prefetching</span>
+                      <span class="pill" style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);">Sub-millisecond RAM Cache</span>
+                    </div>
+                    <label class="switch" title="Enable In-Memory DNS Cache">
+                      <input type="checkbox" id="toggleCachingEnabled">
                       <span class="slider"></span>
                     </label>
                   </div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+                    Stores resolved DNS queries directly in high-speed RAM. Repeated queries resolve in ~0.1ms without touching upstream resolvers.
+                  </p>
 
-                  <div class="form-group" style="margin-top: 10px; max-width: 260px;">
-                    <label class="form-label" for="settingPrefetchThreshold">Prefetch Hit Threshold</label>
-                    <input type="number" id="settingPrefetchThreshold" class="form-input" min="1" max="100" placeholder="5">
-                    <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Min queries required to trigger auto-prefetch</span>
-                  </div>
+                  <form onsubmit="handleSaveCachingSettings(event)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                      <div class="form-group">
+                        <label class="form-label" for="settingCacheMinTtl">Min TTL (Seconds)</label>
+                        <input type="number" id="settingCacheMinTtl" class="form-input" min="0" max="86400" placeholder="300" required>
+                        <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Floor clamp for short records</span>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="settingCacheMaxTtl">Max TTL (Seconds)</label>
+                        <input type="number" id="settingCacheMaxTtl" class="form-input" min="300" max="604800" placeholder="86400" required>
+                        <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Cap ceiling for long records</span>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" for="settingCacheNegTtl">Negative TTL</label>
+                        <input type="number" id="settingCacheNegTtl" class="form-input" min="0" max="86400" placeholder="1800" required>
+                        <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">NXDOMAIN cache duration</span>
+                      </div>
+                    </div>
+
+                    <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                          <strong style="font-size: 0.88rem; color: var(--text-main);">Optimistic Cache Pre-fetching</strong>
+                          <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+                            Silently refreshes popular domain records in the background before TTL expiry so clients never experience latency.
+                          </div>
+                        </div>
+                        <label class="switch" title="Toggle Cache Prefetching">
+                          <input type="checkbox" id="togglePrefetchingEnabled">
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+
+                      <div class="form-group" style="margin-top: 10px; max-width: 260px;">
+                        <label class="form-label" for="settingPrefetchThreshold">Prefetch Hit Threshold</label>
+                        <input type="number" id="settingPrefetchThreshold" class="form-input" min="1" max="100" placeholder="5">
+                        <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; display: block;">Min queries required to trigger auto-prefetch</span>
+                      </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-cyan btn-sm" style="width: 100%;">Save Cache & Prefetch Settings</button>
+                  </form>
                 </div>
 
-                <button type="submit" class="btn btn-cyan btn-sm" style="width: 100%;">Save Cache & Prefetch Settings</button>
-              </form>
-            </div>
+                <!-- DNSSEC & Privacy Shield -->
+                <div class="card">
+                  <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span>🔒 DNSSEC & Upstream Privacy Shield</span>
+                      <span class="pill" style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">RFC Cryptography</span>
+                    </div>
+                  </div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+                    Safeguard DNS integrity against cache poisoning, spoofing, and ISP client IP profiling.
+                  </p>
 
-            <!-- DNSSEC & Privacy Shield -->
-            <div class="card">
-              <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span>🔒 DNSSEC & Upstream Privacy Shield</span>
-                  <span class="pill" style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">RFC Cryptography</span>
+                  <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px;">
+                      <div style="max-width: 80%;">
+                        <strong style="font-size: 0.86rem; color: var(--text-main);">DNSSEC Cryptographic Validation</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">
+                          Requires upstream resolvers to cryptographically validate DNSKEY and RRSIG signatures. Spoofed responses are rejected.
+                        </div>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="toggleDnssecEnabled" onchange="handleToggleDnssec(this)">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px;">
+                      <div style="max-width: 80%;">
+                        <strong style="font-size: 0.86rem; color: var(--text-main);">Anonymize EDNS Client Subnet (ECS)</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">
+                          Strips client IP subnets from EDNS payloads sent to upstream resolvers, preventing CDNs and upstream resolvers from tracking client location.
+                        </div>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="toggleAnonymizeEcs" onchange="handleToggleEcs(this)">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-                Safeguard DNS integrity against cache poisoning, spoofing, and ISP client IP profiling.
-              </p>
 
-              <div style="display: flex; flex-direction: column; gap: 14px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px;">
-                  <div style="max-width: 80%;">
-                    <strong style="font-size: 0.86rem; color: var(--text-main);">DNSSEC Cryptographic Validation</strong>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">
-                      Requires upstream resolvers to cryptographically validate DNSKEY and RRSIG signatures. Spoofed responses are rejected.
-                    </div>
+              <!-- Right Column: System Settings + Change Password + Teleporter -->
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="card">
+                  <div class="card-title">
+                    <span>General System Settings</span>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" id="toggleDnssecEnabled" onchange="handleToggleDnssec(this)">
-                    <span class="slider"></span>
-                  </label>
+
+                  <form onsubmit="handleSaveSettings(event)">
+                    <div class="form-group">
+                      <label class="form-label" for="settingRetention">Log Retention Policy</label>
+                      <select id="settingRetention" class="form-select">
+                        <option value="1">24 Hours (1 Day - Minimal Disk/RAM)</option>
+                        <option value="2">2 Days (48 Hours)</option>
+                        <option value="3">3 Days</option>
+                        <option value="7" selected>7 Days (Recommended)</option>
+                        <option value="14">14 Days</option>
+                        <option value="30">30 Days</option>
+                        <option value="90">90 Days</option>
+                      </select>
+                      <p class="form-hint" style="font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4;">
+                        Defines how long DNS query logs are kept in SQLite before automated background pruning. Keeps storage minimal and protects Raspberry Pi SD cards from wear.
+                      </p>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="settingRouterIp">Router IP for DHCP Reverse PTR</label>
+                      <input type="text" id="settingRouterIp" class="form-input" value="192.168.1.1" required>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 14px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius-md);">
+                      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="settingLogPtrQueries" style="width: 16px; height: 16px; accent-color: var(--accent-cyan); cursor: pointer;">
+                        <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-main);">Log Reverse DNS (PTR) & Special-Use Queries</span>
+                      </label>
+                      <p class="form-hint" style="font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4;">
+                        When disabled (default), noisy internal reverse PTR queries (<code>*.in-addr.arpa</code>, <code>*.ip6.arpa</code>) and Special-Use Domain Name queries are excluded from logs to save disk space and reduce noise.
+                      </p>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Settings</button>
+                  </form>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 8px;">
-                  <div style="max-width: 80%;">
-                    <strong style="font-size: 0.86rem; color: var(--text-main);">Anonymize EDNS Client Subnet (ECS)</strong>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">
-                      Strips client IP subnets from EDNS payloads sent to upstream resolvers, preventing CDNs and upstream resolvers from tracking client location.
-                    </div>
+                <!-- Change Password -->
+                <div class="card">
+                  <div class="card-title">
+                    <span>🔑 Change Admin Password</span>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" id="toggleAnonymizeEcs" onchange="handleToggleEcs(this)">
-                    <span class="slider"></span>
-                  </label>
+                  <form onsubmit="handleChangePassword(event)">
+                    <div class="form-group">
+                      <label class="form-label" for="currentPassword">Current Password</label>
+                      <input type="password" id="currentPassword" class="form-input" placeholder="••••••••" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="newPassword">New Password (min 6 chars)</label>
+                      <input type="password" id="newPassword" class="form-input" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="width: 100%;">Update Password</button>
+                  </form>
+                </div>
+
+                <!-- Backup / Teleporter -->
+                <div class="card">
+                  <div class="card-title">
+                    <span>📦 Backup & Restore (Teleporter)</span>
+                  </div>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+                    Export or import all custom DNS records, blocklists, and friendly device names.
+                  </p>
+                  <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="downloadBackup()" style="flex: 1;">📥 Export JSON</button>
+                    <label class="btn btn-cyan btn-sm" style="flex: 1; cursor: pointer; text-align: center;">
+                      📤 Import JSON
+                      <input type="file" id="backupFileInput" accept=".json" style="display: none;" onchange="uploadBackup(event)">
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- General Settings & Backup -->
-          <div style="display: flex; flex-direction: column; gap: 20px;">
-              <!-- 0. Blocky Engine Integration -->
-              <div class="card" id="cardBlockyIntegration">
-                <div class="card-title">
-                  <span>🧩 Blocky Engine Integration</span>
-                  <span id="blockyIntegrationBadge" class="pill" style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">Checking...</span>
+          <!-- Subpane 3: Diagnostics & Tools -->
+          <div id="subpaneTools" class="sub-pane">
+            <div class="grid-responsive-2col equal" style="margin-bottom: 20px;">
+              <!-- Upstream Speed Benchmark -->
+              <div class="card">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                  <span>🚀 Upstream Speed Latency Benchmark</span>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px;" title="Automatic background benchmark interval">
+                      <span style="font-size: 0.78rem; color: var(--text-muted);">Auto-Benchmark:</span>
+                      <select id="selectAutoBenchmark" class="form-select" onchange="handleUpdateAutoBenchmark(this.value)" style="padding: 2px 6px; font-size: 0.78rem; width: auto; background: var(--bg-input); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); color: var(--text-main);">
+                        <option value="24">Daily (Every 24h)</option>
+                        <option value="12">Every 12 Hours</option>
+                        <option value="6">Every 6 Hours</option>
+                        <option value="0">Disabled (Manual Only)</option>
+                      </select>
+                    </div>
+                    <button id="btnRunBenchmark" class="btn btn-cyan btn-sm" onclick="runBenchmark()">Run Benchmark</button>
+                  </div>
                 </div>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
-                  Configure whether BlockyDNS Hub manages the bundled Blocky container or connects to an existing Blocky server running elsewhere in your homelab.
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">
+                    Tests real-time round-trip latency across all active upstream resolvers.
+                  </p>
+                  <span id="lastBenchmarkTime" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: monospace;"></span>
+                </div>
+                <div id="benchmarkResultsContainer" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="color: var(--text-dim); font-size: 0.85rem; text-align: center; padding: 20px;">
+                    Click "Run Benchmark" to test latency across DoH & DoT providers.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive DNS Diagnostic -->
+              <div class="card">
+                <div class="card-title">
+                  <span>🔍 Interactive DNS Query Diagnostic ("Web Dig")</span>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Inspect domain resolution, rule matching (blocked vs allowed), and response latency.
                 </p>
-                <form onsubmit="handleSaveIntegration(event)">
-                  <div class="form-group">
-                    <label class="form-label">Deployment Architecture Mode</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
-                      <label id="labelModeAllInOne" style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--accent-green); background: rgba(16, 185, 129, 0.08); border-radius: 8px; cursor: pointer;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <input type="radio" name="integrationModeRadio" value="all-in-one" checked onchange="toggleIntegrationModeUI()">
-                          <strong style="font-size: 0.85rem; color: var(--text-main);">All-in-One Engine</strong>
-                        </div>
-                        <span style="font-size: 0.74rem; color: var(--text-dim); margin-left: 24px;">Bundled container on internal bridge network (Default)</span>
-                      </label>
-
-                      <label id="labelModeExisting" style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border); background: var(--bg-card); border-radius: 8px; cursor: pointer;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <input type="radio" name="integrationModeRadio" value="existing" onchange="toggleIntegrationModeUI()">
-                          <strong style="font-size: 0.85rem; color: var(--text-main);">Existing Blocky Server</strong>
-                        </div>
-                        <span style="font-size: 0.74rem; color: var(--text-dim); margin-left: 24px;">Connect to remote Pi, host binary, or external container</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div id="existingBlockyConfigFields" style="display: none; margin-top: 14px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px;">
-                    <div class="form-group">
-                      <label class="form-label" for="settingBlockyApiUrl">Blocky HTTP API Endpoint</label>
-                      <div style="display: flex; gap: 8px;">
-                        <input type="text" id="settingBlockyApiUrl" class="form-input" placeholder="http://192.168.1.50:4000" style="flex: 1;">
-                        <button type="button" class="btn btn-secondary" onclick="handleTestBlockyConnection()" id="btnTestBlocky">⚡ Test Connection</button>
-                      </div>
-                      <span style="font-size: 0.74rem; color: var(--text-dim); margin-top: 4px; display: block;">The base URL of the Blocky API (port 4000 by default).</span>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 10px;">
-                      <label class="form-label" for="settingBlockyConfigPath">Blocky Config File Path (Optional)</label>
-                      <input type="text" id="settingBlockyConfigPath" class="form-input" placeholder="/app/config/config.yml">
-                      <span style="font-size: 0.74rem; color: var(--text-dim); margin-top: 4px; display: block;">Mount or path to config.yml for automated rule synchronization.</span>
-                    </div>
-
-                    <div id="blockyTestResult" style="display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; margin-top: 10px;"></div>
-                  </div>
-
-                  <button type="submit" class="btn btn-primary" style="margin-top: 14px; width: 100%;">Save Integration Architecture</button>
+                <form onsubmit="handleDiagnostic(event)" style="display: flex; gap: 10px; margin-bottom: 16px;">
+                  <input type="text" id="diagnosticDomain" class="form-input" placeholder="e.g. tracking.adservice.google.com" required style="flex: 1;">
+                  <button type="submit" class="btn btn-primary btn-sm">Test Domain</button>
                 </form>
-              </div>
 
+                <div id="diagnosticResultBox" style="display: none; padding: 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+                  <!-- Diagnostic details populated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-responsive-2col equal">
+              <!-- Rebinding Shield -->
               <div class="card">
                 <div class="card-title">
-                  <span>General System Settings</span>
-                </div>
-
-                <form onsubmit="handleSaveSettings(event)">
-                  <div class="form-group">
-                    <label class="form-label" for="settingRetention">Log Retention Policy</label>
-                    <select id="settingRetention" class="form-select">
-                      <option value="1">24 Hours (1 Day - Minimal Disk/RAM)</option>
-                      <option value="2">2 Days (48 Hours)</option>
-                      <option value="3">3 Days</option>
-                      <option value="7" selected>7 Days (Recommended)</option>
-                      <option value="14">14 Days</option>
-                      <option value="30">30 Days</option>
-                      <option value="90">90 Days</option>
-                    </select>
-                    <p class="form-hint" style="font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4;">
-                      Defines how long DNS query logs are kept in SQLite before automated background pruning. Keeps storage minimal and protects Raspberry Pi SD cards from wear.
-                    </p>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label" for="settingRouterIp">Router IP for DHCP Reverse PTR</label>
-                    <input type="text" id="settingRouterIp" class="form-input" value="192.168.1.1" required>
-                  </div>
-
-                  <div class="form-group" style="margin-top: 14px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: var(--radius-md);">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
-                      <input type="checkbox" id="settingLogPtrQueries" style="width: 16px; height: 16px; accent-color: var(--accent-cyan); cursor: pointer;">
-                      <span style="font-weight: 500; font-size: 0.88rem; color: var(--text-main);">Log Reverse DNS (PTR) & Special-Use Queries</span>
-                    </label>
-                    <p class="form-hint" style="font-size: 0.76rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4;">
-                      When disabled (default), noisy internal reverse PTR queries (<code>*.in-addr.arpa</code>, <code>*.ip6.arpa</code>) and Special-Use Domain Name queries are excluded from logs to save disk space and reduce noise.
-                    </p>
-                  </div>
-
-                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Settings</button>
-                </form>
-              </div>
-
-              <!-- Change Password -->
-              <div class="card">
-                <div class="card-title">
-                  <span>🔑 Change Admin Password</span>
-                </div>
-                <form onsubmit="handleChangePassword(event)">
-                  <div class="form-group">
-                    <label class="form-label" for="currentPassword">Current Password</label>
-                    <input type="password" id="currentPassword" class="form-input" placeholder="••••••••" required>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="newPassword">New Password (min 6 chars)</label>
-                    <input type="password" id="newPassword" class="form-input" placeholder="••••••••" required>
-                  </div>
-                  <button type="submit" class="btn btn-secondary" style="width: 100%;">Update Password</button>
-                </form>
-              </div>
-
-              <!-- Backup / Teleporter -->
-              <div class="card">
-                <div class="card-title">
-                  <span>📦 Backup & Restore (Teleporter)</span>
-                </div>
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
-                  Export or import all custom DNS records, blocklists, and friendly device names.
-                </p>
-                <div style="display: flex; gap: 10px;">
-                  <button class="btn btn-secondary btn-sm" onclick="downloadBackup()" style="flex: 1;">📥 Export JSON</button>
-                  <label class="btn btn-cyan btn-sm" style="flex: 1; cursor: pointer; text-align: center;">
-                    📤 Import JSON
-                    <input type="file" id="backupFileInput" accept=".json" style="display: none;" onchange="uploadBackup(event)">
+                  <span>🛡️ DNS Rebinding Protection Shield</span>
+                  <label class="switch">
+                    <input type="checkbox" id="toggleRebindingShield" onchange="handleToggleRebinding(this)">
+                    <span class="slider"></span>
                   </label>
                 </div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+                  Blocks public WAN queries that resolve to private RFC-1918 IPs (<code>192.168.x.x</code>, <code>10.x.x.x</code>, <code>127.0.0.1</code>), neutralizing DNS rebinding attacks against internal smart home and IoT hardware.
+                </p>
+              </div>
+
+              <!-- TLS Info -->
+              <div class="card">
+                <div class="card-title">
+                  <span>🔒 HTTPS / TLS Certificate Status</span>
+                </div>
+                <div id="tlsInfoBox" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                  Loading TLS certificate information...
+                </div>
+              </div>
+            </div>
+
+            <!-- DNSSEC Cryptographic Inspector -->
+            <div class="card" style="margin-top: 20px;">
+              <div class="card-title">
+                <span>🔐 DNSSEC Cryptographic Chain-of-Trust Inspector</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+                Verify public DNSKEYs, DS delegation records at parent TLDs, and RRSIG resource signatures in real time to guarantee cryptographic authenticity.
+              </p>
+              <form onsubmit="handleDnssecInspect(event)" style="display: flex; gap: 10px; margin-bottom: 16px;">
+                <input type="text" id="dnssecInspectDomain" class="form-input" placeholder="e.g. cloudflare.com, ietf.org, or icann.org" required style="flex: 1;">
+                <button type="submit" id="btnDnssecInspect" class="btn btn-cyan btn-sm">Inspect Chain of Trust</button>
+              </form>
+              <div id="dnssecInspectResultBox" style="display: none; padding: 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+                <!-- Populated by JS -->
               </div>
             </div>
           </div>
@@ -986,6 +1016,34 @@
       </main>
     </div>
   </div>
+
+  <!-- Floating Mobile Bottom Navigation Dock (Option 1: Native App Bottom Nav) -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button type="button" id="bottomNavDashboard" class="bottom-nav-item active" onclick="switchView('dashboard')" title="Dashboard">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button type="button" id="bottomNavQueryLog" class="bottom-nav-item" onclick="switchView('queryLog')" title="Query Log">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+      <span class="nav-label">Logs</span>
+    </button>
+    <button type="button" id="bottomNavProtection" class="bottom-nav-item" onclick="switchView('protection')" title="Protection & Filters">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+      <span class="nav-label">Protection</span>
+    </button>
+    <button type="button" id="bottomNavDevices" class="bottom-nav-item" onclick="switchView('devices')" title="Client Devices">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+      <span class="nav-label">Devices</span>
+    </button>
+    <button type="button" id="bottomNavRouting" class="bottom-nav-item" onclick="switchView('routing')" title="DNS Routing">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span class="nav-label">Routing</span>
+    </button>
+    <button type="button" id="bottomNavSettings" class="bottom-nav-item" onclick="switchView('settings')" title="Settings & Tools">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+      <span class="nav-label">Settings</span>
+    </button>
+  </nav>
 
   <!-- Pause Blocking Modal -->
   <div id="pauseModal" class="modal-overlay">
@@ -1111,15 +1169,15 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="/js/app.js?v=17"></script>
-  <script src="/js/dashboard.js?v=16"></script>
-  <script src="/js/queryLog.js?v=16"></script>
-  <script src="/js/blocklists.js?v=16"></script>
-  <script src="/js/devices.js?v=16"></script>
-  <script src="/js/localDns.js?v=16"></script>
-  <script src="/js/routing.js?v=16"></script>
-  <script src="/js/tools.js?v=16"></script>
-  <script src="/js/settings.js?v=16"></script>
-  <script src="/js/services.js?v=16"></script>
+  <script src="/js/app.js?v=21"></script>
+  <script src="/js/dashboard.js?v=21"></script>
+  <script src="/js/queryLog.js?v=21"></script>
+  <script src="/js/blocklists.js?v=21"></script>
+  <script src="/js/devices.js?v=21"></script>
+  <script src="/js/localDns.js?v=21"></script>
+  <script src="/js/routing.js?v=21"></script>
+  <script src="/js/tools.js?v=21"></script>
+  <script src="/js/settings.js?v=21"></script>
+  <script src="/js/services.js?v=21"></script>
 </body>
 </html>

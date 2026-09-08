@@ -1,10 +1,12 @@
 import ipaddress
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, restart_blocky_container
+from blocky_client import sync_config_from_db, schedule_blocky_restart, restart_blocky_container
 from benchmark import benchmark_single_doh, benchmark_single_dot, benchmark_single_udp
+from resolver_utils import normalize_resolver, probe_and_normalize_resolver
 
 router = APIRouter(prefix="/api/upstreams", tags=["upstreams"], dependencies=[Depends(get_current_user)])
 
@@ -21,7 +23,11 @@ def is_private_or_local_ip(host_or_endpoint: str) -> bool:
 class AddUpstreamRequest(BaseModel):
     name: str
     endpoint: str
-    protocol: str # 'doh', 'dot', 'udp'
+    protocol: Optional[str] = None # 'doh', 'dot', 'udp'
+
+class ProbeRequest(BaseModel):
+    endpoint: str
+    protocol: Optional[str] = None
 
 class ToggleUpstreamRequest(BaseModel):
     id: int
@@ -74,14 +80,14 @@ async def set_upstream_strategy(req: StrategyRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True, "strategy": req.strategy}
 
 @router.post("/auto-sort")
 async def auto_sort_upstreams():
     """Re-syncs config ordering based on lowest measured latency."""
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True}
 
 @router.post("/strict-mode")
@@ -101,7 +107,7 @@ async def set_strict_mode(req: StrictModeRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True, "strict_encrypted_mode": req.enabled}
 
 @router.post("/block-ipv6")
@@ -113,7 +119,7 @@ async def set_block_ipv6(req: BlockIpv6Request):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True, "block_ipv6": req.enabled}
 
 @router.post("/toggle")
@@ -138,29 +144,25 @@ async def toggle_upstream(req: ToggleUpstreamRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True}
+
+@router.post("/probe")
+async def probe_endpoint(req: ProbeRequest):
+    """Probes and auto-detects DoT/DoH/UDP protocol and measures latency."""
+    res = await probe_and_normalize_resolver(req.endpoint, req.protocol)
+    return res
 
 @router.post("/add")
 async def add_upstream(req: AddUpstreamRequest):
-    endpoint = req.endpoint.strip()
+    raw_endpoint = req.endpoint.strip()
     name = req.name.strip()
-    protocol = req.protocol.lower()
+    raw_proto = req.protocol.strip().lower() if req.protocol else None
 
-    if protocol not in ["doh", "dot", "udp"]:
-        raise HTTPException(status_code=400, detail="Protocol must be doh, dot, or udp")
-
-    # Smart normalizer: If user entered bare IP/port and selected doh, but port 443 isn't specified
-    if protocol == "doh" and not endpoint.startswith("http://") and not endpoint.startswith("https://"):
-        if is_private_or_local_ip(endpoint):
-            # If user added a local LAN IP (like 10.0.0.254) with doh, but didn't specify https URL, normalize to udp
-            protocol = "udp"
-        else:
-            endpoint = f"https://{endpoint}/dns-query" if "/" not in endpoint else f"https://{endpoint}"
-    elif protocol == "dot" and not endpoint.startswith("tcp-tls:"):
-        endpoint = f"tcp-tls:{endpoint}"
-    elif protocol == "udp":
-        endpoint = endpoint.replace("udp:", "").replace("tcp+udp:", "")
+    # Smart auto-detector and normalizer for DoT / DoH / UDP
+    endpoint, protocol = normalize_resolver(raw_endpoint, raw_proto)
+    if not name:
+        name = endpoint
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -193,16 +195,21 @@ async def add_upstream(req: AddUpstreamRequest):
     try:
         cursor.execute("""
         INSERT INTO upstreams (name, endpoint, protocol, enabled, is_custom, last_latency_ms)
-        VALUES (?, ?, ?, 1, 1, ?);
+        VALUES (?, ?, ?, 1, 1, ?)
+        ON CONFLICT(endpoint) DO UPDATE SET
+            name = excluded.name,
+            protocol = excluded.protocol,
+            enabled = 1,
+            last_latency_ms = excluded.last_latency_ms;
         """, (name, endpoint, protocol, initial_latency))
         conn.commit()
-    except Exception:
+    except Exception as e:
         conn.close()
-        raise HTTPException(status_code=400, detail="Upstream endpoint already exists")
+        raise HTTPException(status_code=400, detail=f"Failed to save upstream: {e}")
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True}
 
 @router.post("/test")
@@ -228,5 +235,5 @@ async def delete_upstream(upstream_id: int):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
+    schedule_blocky_restart()
     return {"success": True}

@@ -1,0 +1,55 @@
+services:
+  # 1. Blocky DNS Engine (Fast Go binary DNS proxy & ad-blocker)
+  blocky:
+    image: ghcr.io/0xerr0r/blocky:latest
+    container_name: blocky-engine
+    restart: unless-stopped
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    environment:
+      - TZ=UTC
+    volumes:
+      - ./config/config.yml:/app/config.yml:ro
+      - ./data:/app/data
+    networks:
+      - blocky-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4000/api/blocking/status || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 2. BlockyDNS Hub Dashboard & Encrypted HTTPS Management UI
+  hub:
+    image: ghcr.io/akhilgupta2007/blocky-dns-ui:latest
+    container_name: blockydns-hub
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # HTTP (Auto-redirects to HTTPS)
+      - "3443:3443"   # End-to-End Encrypted HTTPS (TLS 1.3)
+    environment:
+      - INTEGRATION_MODE=all-in-one
+      - BLOCKY_API_URL=http://blocky:4000
+      - BLOCKY_CONFIG_PATH=/app/config/config.yml
+      - DB_TYPE=sqlite
+      - DATA_DIR=/app/data
+      - CERTS_DIR=/app/certs
+      - HTTP_PORT=3000
+      - HTTPS_PORT=3443
+      - ENABLE_HTTPS=true
+      - JWT_SECRET=change_me_to_a_random_secure_secret_string
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./certs:/app/certs
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      blocky:
+        condition: service_started
+    networks:
+      - blocky-net
+
+networks:
+  blocky-net:
+    name: blocky-net

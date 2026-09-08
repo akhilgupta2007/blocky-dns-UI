@@ -160,7 +160,7 @@ def seed_initial_data():
         ("bbc.co.uk", "https://uk.dns.mullvad.net/dns-query", "UK Geo-Bypass", 1),
         ("hulu.com", "198.51.100.4", "SmartDNS US", 1),
         ("blocked-news.org", "https://dns.quad9.net/dns-query", "Swiss Uncensored", 1),
-        ("*.corp.internal", "10.0.0.2", "Company VPN", 1)
+        ("*.corp.internal", "172.16.0.2", "Company VPN", 1)
     ]
     for ro in routings:
         cursor.execute("""

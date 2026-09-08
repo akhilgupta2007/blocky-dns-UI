@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, restart_blocky_container, flush_cache
+from blocky_client import sync_config_from_db, schedule_blocky_restart
 
 router = APIRouter(prefix="/api/local-dns", tags=["local-dns"], dependencies=[Depends(get_current_user)])
 
@@ -39,8 +39,7 @@ async def add_local_dns(req: AddLocalDnsRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
-    await flush_cache()
+    schedule_blocky_restart()
     return {"success": True}
 
 @router.delete("/{target}")
@@ -56,6 +55,5 @@ async def delete_local_dns(target: str):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
-    await flush_cache()
+    schedule_blocky_restart()
     return {"success": True}

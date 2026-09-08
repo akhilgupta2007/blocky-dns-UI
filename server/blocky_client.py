@@ -3,6 +3,7 @@ import os
 import json
 import yaml
 import httpx
+import asyncio
 from pathlib import Path
 from database import get_connection
 
@@ -125,11 +126,14 @@ async def enable_blocking():
         return False
 
 async def pause_blocking(duration_str: str = "5m"):
-    """Temporarily disables DNS blocking (e.g. 5m, 15m, 1h)."""
+    """Temporarily or indefinitely disables DNS blocking (e.g. 1m, 10m, 30m, 1h, permanent)."""
     api_url = get_blocky_api_url()
     try:
+        url = f"{api_url}/api/blocking/disable"
+        if duration_str and duration_str.lower() != "permanent":
+            url = f"{api_url}/api/blocking/disable?duration={duration_str}"
         async with httpx.AsyncClient(timeout=4.0) as client:
-            resp = await client.get(f"{api_url}/api/blocking/disable?duration={duration_str}")
+            resp = await client.get(url)
             return resp.status_code == 200
     except Exception:
         return False
@@ -183,15 +187,37 @@ def sync_config_from_db():
     cursor.execute("SELECT endpoint, protocol, last_latency_ms FROM upstreams WHERE enabled = 1 ORDER BY id ASC;")
     upstream_rows = cursor.fetchall()
 
-    # 2. Fetch local DNS mappings
+    # 2. Fetch local DNS mappings (strip wildcard prefixes so Blocky's engine resolves apex and subdomains)
     cursor.execute("SELECT domain, ip_address FROM local_dns WHERE enabled = 1;")
     local_dns_rows = cursor.fetchall()
-    custom_dns_mapping = {row["domain"]: row["ip_address"] for row in local_dns_rows}
+    custom_dns_mapping = {}
+    for row in local_dns_rows:
+        dom = row["domain"].strip().lower()
+        if dom.startswith("*."):
+            dom = dom[2:]
+        elif dom.startswith("."):
+            dom = dom[1:]
+        dom = dom.rstrip(".")
+        if dom:
+            custom_dns_mapping[dom] = row["ip_address"]
 
-    # 3. Fetch domain-specific routing (conditional)
+    # 3. Fetch domain-specific routing (conditional upstreams)
+    # Strip wildcard prefixes (*.domain.com -> domain.com) so Blocky matches domain and all subdomains
     cursor.execute("SELECT domain_pattern, resolver FROM domain_routing WHERE enabled = 1;")
     routing_rows = cursor.fetchall()
-    conditional_mapping = {row["domain_pattern"]: row["resolver"] for row in routing_rows}
+    conditional_mapping = {}
+    for row in routing_rows:
+        pat = row["domain_pattern"].strip().lower()
+        if pat.startswith("*."):
+            clean_pat = pat[2:]
+        elif pat.startswith("."):
+            clean_pat = pat[1:]
+        else:
+            clean_pat = pat
+        clean_pat = clean_pat.rstrip(".")
+        if clean_pat:
+            conditional_mapping[clean_pat] = row["resolver"]
+
     # Always ensure local subnet reverse PTR forwarding is included if enabled
     cursor.execute("SELECT value FROM settings WHERE key = 'router_ip';")
     router_row = cursor.fetchone()
@@ -450,6 +476,31 @@ def sync_config_from_db():
 
 
 
+_restart_task = None
+
+def schedule_blocky_restart(delay_seconds: float = 0.5):
+    """Debounces rapid configuration updates and restarts blocky in the background without blocking the UI."""
+    global _restart_task
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        if _restart_task and not _restart_task.done():
+            _restart_task.cancel()
+
+        async def _delayed_restart():
+            try:
+                await asyncio.sleep(delay_seconds)
+                await restart_blocky_container()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"[Blocky] Restart error: {e}")
+
+        _restart_task = loop.create_task(_delayed_restart())
+
 async def restart_blocky_container():
     """Attempts to restart blocky-engine container via Docker socket if mounted."""
     docker_sock = Path("/var/run/docker.sock")
@@ -457,10 +508,11 @@ async def restart_blocky_container():
         return {"restarted": False, "reason": "Docker socket /var/run/docker.sock not mounted"}
     try:
         transport = httpx.AsyncHTTPTransport(uds=str(docker_sock))
-        async with httpx.AsyncClient(transport=transport, timeout=15.0) as client:
-            resp = await client.post("http://localhost/containers/blocky-engine/restart")
+        async with httpx.AsyncClient(transport=transport, timeout=10.0) as client:
+            # Pass ?t=1 so Docker shuts down Blocky in 1s rather than waiting for 10s default stop timeout
+            resp = await client.post("http://localhost/containers/blocky-engine/restart?t=1")
             if resp.status_code in [200, 204]:
-                print("[Blocky] Successfully restarted blocky-engine container via Docker socket.")
+                print("[Blocky] Fast-restarted blocky-engine container via Docker socket.")
                 return {"restarted": True, "status": "restarted", "container": "blocky-engine"}
 
             # Fallback: query containers if renamed or default compose naming used
@@ -473,9 +525,9 @@ async def restart_blocky_container():
                         for n in names:
                             clean_n = n.lstrip("/")
                             if "blocky" in clean_n and "hub" not in clean_n:
-                                retry_resp = await client.post(f"http://localhost/containers/{clean_n}/restart")
+                                retry_resp = await client.post(f"http://localhost/containers/{clean_n}/restart?t=1")
                                 if retry_resp.status_code in [200, 204]:
-                                    print(f"[Blocky] Successfully restarted {clean_n} via Docker socket.")
+                                    print(f"[Blocky] Fast-restarted {clean_n} via Docker socket.")
                                     return {"restarted": True, "status": "restarted", "container": clean_n}
 
             return {"restarted": False, "status": f"HTTP {resp.status_code}", "body": resp.text}

@@ -61,6 +61,10 @@ async function handleAddBlocklist(event) {
   event.preventDefault();
   const name = document.getElementById("newListName").value.trim();
   const url = document.getElementById("newListUrl").value.trim();
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Adding...");
+  }
 
   try {
     const res = await apiRequest("/api/blocklists/add", {
@@ -76,6 +80,10 @@ async function handleAddBlocklist(event) {
   } catch (err) {
     showToast(`Failed to add blocklist: ${err.message}`, "error");
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -158,8 +166,24 @@ function renderRules(rules) {
       : `<span style="font-size: 0.78rem; color: var(--text-dim);">-</span>`;
 
     return `
-      <tr>
-        <td>
+      <tr class="custom-rule-card-row">
+        <!-- MOBILE VIEW -->
+        <td class="mobile-only">
+          <div class="rule-card-top">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;">
+              <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
+              <code class="rule-domain-code" style="color: ${typeColor};">${r.domain}</code>
+              ${scopeBadge}
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="window.handleDeleteRule('${target}')" style="padding: 3px 8px; font-size: 0.8rem;" title="Delete rule">
+              ✕
+            </button>
+          </div>
+          ${r.comment ? `<div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 4px;">${r.comment}</div>` : ""}
+        </td>
+
+        <!-- DESKTOP VIEW -->
+        <td class="desktop-only">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
             <code style="font-family: monospace; font-size: 0.84rem; font-weight: 600; color: ${typeColor}; word-break: break-all;">
@@ -168,9 +192,9 @@ function renderRules(rules) {
             ${scopeBadge}
           </div>
         </td>
-        <td>${typeBadge}</td>
-        <td>${note}</td>
-        <td style="text-align: right;">
+        <td class="desktop-only">${typeBadge}</td>
+        <td class="desktop-only">${note}</td>
+        <td class="desktop-only" style="text-align: right;">
           <button type="button" class="btn btn-icon" onclick="window.handleDeleteRule('${target}')" style="color: var(--accent-red); padding: 4px 8px; font-size: 0.85rem;" title="Delete rule">
             ✕
           </button>
@@ -183,6 +207,10 @@ function renderRules(rules) {
 async function handleAddRule(event) {
   event.preventDefault();
   const domain = document.getElementById("newRuleDomain").value.trim();
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Adding...");
+  }
 
   try {
     const res = await apiRequest("/api/rules/add", {
@@ -197,6 +225,10 @@ async function handleAddRule(event) {
   } catch (err) {
     showToast(`Failed to add rule: ${err.message}`, "error");
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 

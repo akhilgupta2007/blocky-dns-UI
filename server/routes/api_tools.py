@@ -7,6 +7,7 @@ from auth import get_current_user
 from benchmark import run_upstream_benchmark
 from tls_manager import get_certificate_info
 from blocky_client import query_diagnostic_api
+from routing_cache import get_cached_routing_rules
 
 router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(get_current_user)])
 
@@ -135,6 +136,15 @@ async def run_diagnostic(req: DiagnosticRequest):
         elif any(ad in domain for ad in ["analytics", "doubleclick", "telemetry", "tracking", "adservice", "pixel"]):
             blocked_by_list = "StevenBlack Unified (Adware/Tracking)"
 
+    # 5. Check Domain-Specific Routing (Conditional Upstreams from in-memory cache)
+    routing_match = None
+    if not local_match and not blocked_by_list:
+        for r in get_cached_routing_rules():
+            pat = r["pattern"]
+            if domain == pat or domain.endswith("." + pat):
+                routing_match = r
+                break
+
     elapsed = round((time.perf_counter() - start_time) * 1000, 1)
 
     # Resolution result
@@ -149,10 +159,17 @@ async def run_diagnostic(req: DiagnosticRequest):
         resolved_ip = "0.0.0.0"
         status = "BLOCKED"
         rule_match = f"Blocked by: {blocked_by_list}"
+    elif routing_match:
+        try:
+            resolved_ip = socket.gethostbyname(domain)
+        except Exception:
+            resolved_ip = "1.1.1.1"
+        tag = routing_match["tag"] or "Geo-Bypass"
+        rule_match = f"Domain Routing: {tag} ({routing_match['resolver']})"
     else:
         try:
             resolved_ip = socket.gethostbyname(domain)
-            rule_match = "Resolved via Cloudflare DoH (TLS 1.3)"
+            rule_match = "Resolved via Upstream (Clean)"
         except Exception:
             resolved_ip = "NXDOMAIN"
             status = "FAILED"

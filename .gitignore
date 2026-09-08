@@ -30,3 +30,15 @@ certs/*.crt
 Thumbs.db
 .vscode/
 .idea/
+
+# Local deployment and install scripts
+deploy.bat
+deploy.ps1
+fresh-install.bat
+fresh-install.ps1
+update.tar.gz
+
+# Local testing and artifacts
+test_output/
+test_ui_loaders.py
+

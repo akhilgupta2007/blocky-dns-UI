@@ -54,6 +54,7 @@ async function updateRetentionBadge() {
 }
 
 async function refreshQueryLogs() {
+  await loadRoutingRulesCache(true);
   const search = document.getElementById("logSearchInput")?.value.trim() || "";
   const clientIp = document.getElementById("logDeviceSelect")?.value || "";
   const status = document.getElementById("logStatusSelect")?.value || "ALL";
@@ -80,7 +81,7 @@ async function refreshQueryLogs() {
 
   try {
     const includePtr = document.getElementById("logIncludePtrCheck")?.checked || false;
-    let url = `/api/logs?page=${logCurrentPage}&limit=${logLimit}&search=${encodeURIComponent(search)}&client_ip=${encodeURIComponent(clientIp)}&status=${encodeURIComponent(status)}&include_ptr=${includePtr}`;
+    let url = `/api/logs?page=${logCurrentPage}&limit=${logLimit}&search=${encodeURIComponent(search)}&client_ip=${encodeURIComponent(clientIp)}&status=${encodeURIComponent(status)}&response_type=${encodeURIComponent(status)}&include_ptr=${includePtr}`;
     if (fromTs) url += `&from_ts=${encodeURIComponent(fromTs)}`;
     if (toTs) url += `&to_ts=${encodeURIComponent(toTs)}`;
 
@@ -247,6 +248,180 @@ function filterLogsByDomain(domain) {
 let liveStreamSource = null;
 let maxStreamLogId = 0;
 
+function toggleIpExpansion(uid, btn) {
+  const el = document.getElementById(uid);
+  if (!el) return;
+  const isHidden = el.style.display === "none" || !el.style.display;
+  if (isHidden) {
+    el.style.display = "flex";
+    btn.innerHTML = `▲ collapse`;
+    btn.classList.add("expanded");
+  } else {
+    el.style.display = "none";
+    const count = el.dataset.count || "";
+    btn.innerHTML = `+${count} more`;
+    btn.classList.remove("expanded");
+  }
+}
+window.toggleIpExpansion = toggleIpExpansion;
+
+function formatResolvedAnswer(answerStr, responseType, rowId) {
+  if (responseType === "BLOCKED") {
+    return `<span style="color: var(--accent-red); font-family: monospace; font-size: 0.78rem; font-weight: 600;">0.0.0.0</span>`;
+  }
+
+  if (!answerStr || !answerStr.trim()) {
+    return `<span style="color: var(--text-dim); font-size: 0.8rem;">-</span>`;
+  }
+
+  // Split multiple IPs / answers by comma, semicolon, space, or newline
+  const parts = answerStr
+    .split(/[\s,;]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return `<span style="color: var(--text-dim); font-size: 0.8rem;">-</span>`;
+  }
+
+  const firstIp = parts[0];
+
+  if (parts.length === 1) {
+    return `<code class="ip-badge-single" style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${firstIp}</code>`;
+  }
+
+  const remainingCount = parts.length - 1;
+  const uid = `ips-${rowId || Math.random().toString(36).substring(2, 9)}`;
+
+  return `
+    <div class="resolved-ip-cell" style="display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 100%;">
+      <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+        <code style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${firstIp}</code>
+        <button type="button" class="btn-ip-expand" onclick="toggleIpExpansion('${uid}', this)" title="Click to view all ${parts.length} resolved records" style="background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.35); border-radius: 4px; padding: 1px 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; user-select: none; white-space: nowrap;">
+          +${remainingCount} more
+        </button>
+      </div>
+      <div id="${uid}" data-count="${remainingCount}" style="display: none; flex-direction: column; gap: 4px; background: rgba(13, 19, 33, 0.98); border: 1px solid var(--border-cyan); border-radius: 6px; padding: 6px 10px; margin-top: 3px; max-height: 140px; max-width: 260px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 20;">
+        ${parts.map((ip, idx) => `
+          <div style="display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 0.74rem; color: ${idx === 0 ? 'var(--accent-cyan)' : 'var(--text-muted)'};">
+            <span style="color: var(--text-dim); font-size: 0.65rem; min-width: 16px;">#${idx + 1}</span>
+            <span style="word-break: break-all;">${ip}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+let cachedRoutingRules = [];
+
+async function loadRoutingRulesCache(force = false) {
+  if (!force && cachedRoutingRules.length > 0) return cachedRoutingRules;
+  try {
+    const data = await apiRequest("/api/routing");
+    if (Array.isArray(data)) {
+      cachedRoutingRules = data
+        .filter(r => r.enabled !== 0 && r.enabled !== "0" && r.enabled !== false && r.enabled !== "false")
+        .map(r => {
+          let pat = (r.domain_pattern || "").trim().toLowerCase();
+          pat = pat.replace(/^\*\./, "").replace(/^\./, "").replace(/\.$/, "");
+          return {
+            pattern: pat,
+            resolver: r.resolver || "",
+            tag: r.tag || ""
+          };
+        })
+        .filter(r => r.pattern && r.resolver);
+    }
+  } catch (e) {
+    console.warn("Failed to load routing rules cache:", e);
+  }
+  return cachedRoutingRules;
+}
+window.loadRoutingRulesCache = loadRoutingRulesCache;
+
+// Pre-load routing rules immediately in background
+try { loadRoutingRulesCache(); } catch (e) {}
+
+function formatQueryReason(reason, responseType, question) {
+  if (!reason && !responseType) return "";
+  const type = (responseType || "").toUpperCase().trim();
+  const raw = (reason || "").trim();
+
+  // 1. BLOCKED & REBIND
+  if (type === "BLOCKED" || type === "REBIND") {
+    if (type === "REBIND") return "Blocked by: DNS Rebinding Protection";
+    if (!raw || raw === "BLOCKED") return "Blocked by deny list";
+    
+    // Check if raw is like "BLOCKED (list_name)" or "BLOCKED (regex)"
+    const match = raw.match(/^BLOCKED\s*\((.+)\)$/i);
+    if (match) {
+      return `Blocked by: ${match[1].trim()}`;
+    }
+    if (raw.toLowerCase().startsWith("blocked by:")) {
+      return raw;
+    }
+    return `Blocked by: ${raw}`;
+  }
+
+  // 2. RESOLVED
+  if (type === "RESOLVED") {
+    if (!raw) return "";
+    // Check if raw is like "RESOLVED (https://dns.quad9.net/dns-query)"
+    const match = raw.match(/^RESOLVED\s*\((.+)\)$/i);
+    if (match) {
+      return `Upstream: ${match[1].trim()}`;
+    }
+    if (raw === "RESOLVED") return "";
+    return `Upstream: ${raw}`;
+  }
+
+  // 3. CONDITIONAL (Domain Routing)
+  if (type === "CONDITIONAL") {
+    // A. Check if raw already has enriched resolver like "CONDITIONAL (tcp-tls:... [Tag])"
+    const match = raw.match(/^CONDITIONAL\s*\((.+)\)$/i);
+    if (match) {
+      return `Upstream: ${match[1].trim()}`;
+    }
+    // B. Fallback: match domain question against active routing rules
+    if (question && cachedRoutingRules.length > 0) {
+      const q = question.toLowerCase().trim().replace(/\.$/, "");
+      const matched = cachedRoutingRules.find(r => q === r.pattern || q.endsWith("." + r.pattern));
+      if (matched) {
+        const tagPart = matched.tag ? ` [${matched.tag}]` : "";
+        return `Upstream: ${matched.resolver}${tagPart}`;
+      }
+    }
+    if (raw && raw !== "CONDITIONAL") {
+      return `Upstream: ${raw}`;
+    }
+    return "Domain Routing (Custom Upstream)";
+  }
+
+  // 4. CACHED
+  if (type === "CACHED") {
+    // If reason is just CACHED or empty, don't show any redundant text
+    if (!raw || raw.toUpperCase() === "CACHED" || raw.toLowerCase() === "cache hit") {
+      return "";
+    }
+    return raw;
+  }
+
+  // 5. CUSTOMDNS
+  if (type === "CUSTOMDNS") {
+    return "Local DNS record";
+  }
+
+  // 6. HOSTSFILE
+  if (type === "HOSTSFILE") {
+    return "Hosts file entry";
+  }
+
+  // Fallback for any other types
+  if (!raw || raw.toUpperCase() === type) return "";
+  return raw;
+}
+
 function renderLogRow(r) {
   const iconMap = { tv: "📺", laptop: "💻", phone: "📱", tablet: "📱", iot: "💡", server: "🖥️", printer: "🖨️", device: "🔌" };
   const icon = iconMap[r.client_icon] || "🔌";
@@ -255,42 +430,53 @@ function renderLogRow(r) {
   else if (r.response_type === "CACHED") pillClass = "cached";
 
   const localTimeStr = formatLocalIsoTimestamp(r.request_ts);
-
-  // Format resolved answer IP address
-  let answerHtml = `<span style="color: var(--text-dim); font-size: 0.8rem;">-</span>`;
-  if (r.response_type === "BLOCKED") {
-    answerHtml = `<span style="color: var(--accent-red); font-family: monospace; font-size: 0.8rem; font-weight: 600;">0.0.0.0</span>`;
-  } else if (r.answer && r.answer.trim()) {
-    answerHtml = `<code style="color: var(--accent-cyan); font-size: 0.8rem; word-break: break-all; font-weight: 500;">${r.answer.trim()}</code>`;
-  }
-
+  const answerHtml = formatResolvedAnswer(r.answer, r.response_type, r.id);
   const qType = r.question_type || "A";
+  const reasonText = formatQueryReason(r.reason, r.response_type, r.question);
+  const isBlockedType = (r.response_type === "BLOCKED" || r.response_type === "REBIND");
+  const reasonColor = isBlockedType ? "var(--accent-red)" : "var(--text-dim)";
 
   return `
-    <tr id="log-row-${r.id || 'live'}" style="transition: background 0.5s ease;">
-      <td style="color: var(--text-muted); font-size: 0.82rem; font-family: monospace; white-space: nowrap;" title="Raw timestamp: ${r.request_ts}">${localTimeStr}</td>
-      <td>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span>${icon}</span>
-          <span style="font-weight: 600;">${r.client_name || r.client_ip}</span>
+    <tr id="log-row-${r.id || 'live'}" class="query-log-row" style="transition: background 0.3s ease;">
+      <td class="col-time desktop-only" style="color: var(--text-muted); font-size: 0.82rem; font-family: monospace; white-space: nowrap;" title="Raw timestamp: ${r.request_ts}">${localTimeStr}</td>
+      <td class="col-client">
+        <div class="client-cell-content">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>${icon}</span>
+            <span style="font-weight: 600;">${r.client_name || r.client_ip}</span>
+            <span class="client-ip-sub" style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">(${r.client_ip})</span>
+          </div>
+          <div class="mobile-card-meta">
+            <span>${localTimeStr}</span>
+            <span style="color: var(--accent-cyan); margin-left: 6px;">⚡ ${r.duration_ms}ms</span>
+          </div>
         </div>
-        <div style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">${r.client_ip}</div>
       </td>
-      <td>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span style="font-family: monospace; font-weight: 600; word-break: break-all; color: var(--text-main);">${r.question}</span>
-          <span class="pill" style="font-size: 0.65rem; padding: 1px 5px; background: rgba(255,255,255,0.06); text-transform: uppercase;">${qType}</span>
+      <td class="col-domain">
+        <div class="domain-cell-content">
+          <div class="domain-header-line">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+              <span class="domain-text">${r.question}</span>
+              <span class="pill pill-qtype" style="font-size: 0.65rem; padding: 1px 5px; background: rgba(255,255,255,0.06); text-transform: uppercase;">${qType}</span>
+            </div>
+            <span class="pill ${pillClass} mobile-status-tag">${r.response_type}</span>
+          </div>
+          ${reasonText ? `<div class="block-reason-text" style="font-size: 0.72rem; color: ${reasonColor}; margin-top: 2px;">${reasonText}</div>` : ""}
         </div>
-        ${r.reason ? `<div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">${r.reason}</div>` : ""}
       </td>
-      <td>${answerHtml}</td>
-      <td><span class="pill ${pillClass}">${r.response_type}</span></td>
-      <td style="color: var(--text-muted); font-size: 0.82rem;">${r.duration_ms}ms</td>
-      <td>
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <button class="btn btn-secondary btn-sm" onclick="window.openWhoisModal('${r.question}')" title="Inspect WHOIS & Domain Intelligence" style="padding: 3px 8px; font-size: 0.75rem;">ℹ️ Whois</button>
-          <button class="btn btn-secondary btn-sm" onclick="quickAddRule('whitelist', '${r.question}')" title="Whitelist domain" style="padding: 3px 8px; font-size: 0.75rem;">✓ Allow</button>
-          <button class="btn btn-danger btn-sm" onclick="quickAddRule('blacklist', '${r.question}')" title="Blacklist domain" style="padding: 3px 8px; font-size: 0.75rem;">✕ Block</button>
+      <td class="col-answer">
+        <div class="answer-cell-content">
+          <span class="mobile-field-tag">Resolved IP:</span>
+          ${answerHtml}
+        </div>
+      </td>
+      <td class="col-status desktop-only"><span class="pill ${pillClass}">${r.response_type}</span></td>
+      <td class="col-latency desktop-only" style="color: var(--text-muted); font-size: 0.82rem;">⚡ ${r.duration_ms}ms</td>
+      <td class="col-actions">
+        <div class="actions-button-group">
+          <button class="btn btn-secondary btn-sm" onclick="window.openWhoisModal('${r.question}')" title="Inspect WHOIS & Domain Intelligence">ℹ️ Whois</button>
+          <button class="btn btn-secondary btn-sm btn-allow" onclick="quickAddRule('whitelist', '${r.question}')" title="Whitelist domain">✓ Allow</button>
+          <button class="btn btn-danger btn-sm btn-block" onclick="quickAddRule('blacklist', '${r.question}')" title="Blacklist domain">✕ Block</button>
         </div>
       </td>
     </tr>
@@ -354,7 +540,13 @@ function toggleLiveStream() {
         return;
       }
       if (clientIp && log.client_ip !== clientIp) return;
-      if (status !== "ALL" && log.response_type !== status) return;
+      if (status !== "ALL") {
+        if (status === "BLOCKED") {
+          if (log.response_type !== "BLOCKED" && log.response_type !== "REBIND") return;
+        } else if (log.response_type !== status) {
+          return;
+        }
+      }
 
       const tbody = document.getElementById("queryLogsTableBody");
       if (!tbody) return;

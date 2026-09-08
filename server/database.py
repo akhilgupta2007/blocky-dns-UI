@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,7 +11,47 @@ except Exception:
     pass
 DB_PATH = DATA_DIR / "blockydns.db"
 
+def recover_corrupt_database(conn=None):
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    import gc
+    gc.collect()
+    import time
+    ts = int(time.time())
+    print(f"[DB ALERT] Corrupt SQLite database detected. Archiving and recovering...")
+    for ext in ["", "-wal", "-shm"]:
+        p = Path(str(DB_PATH) + ext)
+        if p.exists():
+            try:
+                p.rename(DATA_DIR / f"blockydns_corrupt_{ts}.db{ext}")
+            except Exception:
+                try:
+                    p.unlink(missing_ok=True)
+                except Exception:
+                    try:
+                        with open(str(p), "wb") as f:
+                            f.truncate(0)
+                    except Exception:
+                        pass
+
+def ensure_db_permissions():
+    try:
+        os.chmod(str(DATA_DIR), 0o777)
+    except Exception:
+        pass
+    for ext in ["", "-wal", "-shm"]:
+        p = Path(str(DB_PATH) + ext)
+        if p.exists():
+            try:
+                os.chmod(str(p), 0o666)
+            except Exception:
+                pass
+
 def get_connection():
+    conn = None
     try:
         conn = sqlite3.connect(str(DB_PATH), timeout=20.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
@@ -23,20 +62,9 @@ def get_connection():
         conn.execute("PRAGMA foreign_keys = ON;")
         return conn
     except sqlite3.DatabaseError as e:
-        if "malformed" in str(e).lower():
-            print(f"[DB ALERT] Malformed SQLite database detected ({e}). Automatically recovering clean database...")
-            import time
-            ts = int(time.time())
-            for ext in ["", "-wal", "-shm"]:
-                p = Path(str(DB_PATH) + ext)
-                if p.exists():
-                    try:
-                        p.rename(DATA_DIR / f"blockydns_corrupt_{ts}.db{ext}")
-                    except Exception:
-                        try:
-                            p.unlink()
-                        except Exception:
-                            pass
+        err_msg = str(e).lower()
+        if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
+            recover_corrupt_database(conn)
             conn = sqlite3.connect(str(DB_PATH), timeout=20.0, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode = WAL;")
@@ -47,8 +75,25 @@ def get_connection():
         raise
 
 def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
+    ensure_db_permissions()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA integrity_check(1);")
+        row = cursor.fetchone()
+        if row and str(row[0]).lower() != "ok":
+            conn.close()
+            recover_corrupt_database()
+            conn = get_connection()
+            cursor = conn.cursor()
+    except sqlite3.DatabaseError as err:
+        err_msg = str(err).lower()
+        if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
+            recover_corrupt_database()
+            conn = get_connection()
+            cursor = conn.cursor()
+        else:
+            raise
 
     # 1. Users table (Admin auth)
     cursor.execute("""
@@ -179,6 +224,12 @@ def init_db():
                     cursor.execute(f"ALTER TABLE log_entries ADD COLUMN {col_name} {col_type} DEFAULT '';")
                 except Exception:
                     pass
+        # Synchronize question and question_name so both are always populated
+        try:
+            cursor.execute("UPDATE log_entries SET question = question_name WHERE (question = '' OR question IS NULL) AND question_name IS NOT NULL AND question_name != '';")
+            cursor.execute("UPDATE log_entries SET question_name = question WHERE (question_name = '' OR question_name IS NULL) AND question IS NOT NULL AND question != '';")
+        except Exception:
+            pass
     except Exception as err:
         print(f"[DB] Migration note: {err}")
 

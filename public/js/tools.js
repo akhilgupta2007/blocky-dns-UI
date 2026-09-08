@@ -123,7 +123,11 @@ async function handleUpdateAutoBenchmark(hours) {
 async function runBenchmark() {
   const container = document.getElementById("benchmarkResultsContainer");
   const btn = document.getElementById("btnRunBenchmark");
-  if (btn) btn.disabled = true;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Testing...");
+  } else if (btn) {
+    btn.disabled = true;
+  }
   if (container) {
     container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 8px;"><div class="action-status-spinner" style="width: 18px; height: 18px;"></div> Testing RTT latency across all candidate resolvers...</div>`;
   }
@@ -141,7 +145,11 @@ async function runBenchmark() {
   } catch (err) {
     console.error(err);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    } else if (btn) {
+      btn.disabled = false;
+    }
   }
 }
 
@@ -149,8 +157,12 @@ async function handleDiagnostic(event) {
   event.preventDefault();
   const domain = document.getElementById("diagnosticDomain").value.trim();
   const box = document.getElementById("diagnosticResultBox");
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Testing...");
+  }
   box.style.display = "block";
-  box.innerHTML = `<div style="text-align: center; color: var(--text-dim);">Resolving and checking rule matches for ${domain}...</div>`;
+  box.innerHTML = `<div style="text-align: center; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 8px;"><div class="action-status-spinner" style="width: 16px; height: 16px;"></div> Resolving and checking rule matches for ${domain}...</div>`;
 
   try {
     const res = await apiRequest("/api/tools/diagnostic", {
@@ -174,6 +186,10 @@ async function handleDiagnostic(event) {
     }
   } catch (err) {
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -196,10 +212,14 @@ async function handleDnssecInspect(event) {
 
   const btn = document.getElementById("btnDnssecInspect");
   const resultBox = document.getElementById("dnssecInspectResultBox");
-  if (btn) btn.disabled = true;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Inspecting...");
+  } else if (btn) {
+    btn.disabled = true;
+  }
   if (resultBox) {
     resultBox.style.display = "block";
-    resultBox.innerHTML = `<div style="text-align: center; color: var(--accent-cyan); padding: 12px;">Querying DNSKEY, DS, and RRSIG records for ${domain}...</div>`;
+    resultBox.innerHTML = `<div style="text-align: center; color: var(--accent-cyan); padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;"><div class="action-status-spinner" style="width: 16px; height: 16px;"></div> Querying DNSKEY, DS, and RRSIG records for ${domain}...</div>`;
   }
 
   try {
@@ -263,7 +283,11 @@ async function handleDnssecInspect(event) {
       resultBox.innerHTML = `<div style="color: var(--accent-red); padding: 10px;">Inspection failed: ${err.message || err}</div>`;
     }
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    } else if (btn) {
+      btn.disabled = false;
+    }
   }
 }
 
@@ -271,6 +295,8 @@ async function handleDnssecInspect(event) {
 window.loadToolsInfo = loadToolsInfo;
 window.handleUpdateAutoBenchmark = handleUpdateAutoBenchmark;
 window.runBenchmark = runBenchmark;
-window.runDiagnostic = runDiagnostic;
-window.inspectDnssec = inspectDnssec;
+window.handleDiagnostic = handleDiagnostic;
+window.handleDnssecInspect = handleDnssecInspect;
+window.runDiagnostic = handleDiagnostic;
+window.inspectDnssec = handleDnssecInspect;
 

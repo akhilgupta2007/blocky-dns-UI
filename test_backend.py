@@ -106,6 +106,21 @@ class TestBlockyDnsHub(unittest.TestCase):
         self.assertGreater(range_logs["total_records"], 0)
         print(f"[OK] Query log date range filter verified: {range_logs['total_records']} records matched")
 
+        # Test Status Filters (Blocked Only & Resolved Only)
+        blocked_res = self.client.get("/api/logs?page=1&limit=20&status=BLOCKED", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(blocked_res.status_code, 200)
+        blocked_logs = blocked_res.json()
+        self.assertGreater(len(blocked_logs["records"]), 0)
+        self.assertTrue(all(r["response_type"] in ("BLOCKED", "REBIND") for r in blocked_logs["records"]))
+        print(f"[OK] Query log status=BLOCKED filter verified: {len(blocked_logs['records'])} blocked records (0 resolved/cached leaked)")
+
+        resolved_res = self.client.get("/api/logs?page=1&limit=20&status=RESOLVED", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(resolved_res.status_code, 200)
+        resolved_logs = resolved_res.json()
+        self.assertGreater(len(resolved_logs["records"]), 0)
+        self.assertTrue(all(r["response_type"] == "RESOLVED" for r in resolved_logs["records"]))
+        print(f"[OK] Query log status=RESOLVED filter verified: {len(resolved_logs['records'])} resolved records")
+
 
     def test_05_blocklists_and_custom_rules(self):
         # 1. List blocklists
@@ -151,6 +166,130 @@ class TestBlockyDnsHub(unittest.TestCase):
         self.assertEqual(list_route.status_code, 200)
         self.assertTrue(any(r["domain_pattern"] == "streaming-uk.service" for r in list_route.json()))
         print("[OK] Domain-specific Geo-Bypass upstream routing verified")
+
+    def test_07b_wildcard_routing_normalization(self):
+        # Test adding a route with a wildcard prefix (*.example-routed.org)
+        add_route = self.client.post("/api/routing/add", headers=TestBlockyDnsHub.headers, json={
+            "domain_pattern": "*.example-routed.org",
+            "resolver": "tcp-tls:common.dot.dns.yandex.net:853",
+            "tag": "Yandex DoT"
+        })
+        self.assertEqual(add_route.status_code, 200)
+
+        # Verify config.yml has cleaned key 'example-routed.org' without '*.' so Blocky engine matches it hierarchically
+        import yaml
+        cfg_path = os.environ.get("BLOCKY_CONFIG_PATH")
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        self.assertIn("example-routed.org", cfg["conditional"]["mapping"])
+        self.assertNotIn("*.example-routed.org", cfg["conditional"]["mapping"])
+        self.assertEqual(cfg["conditional"]["mapping"]["example-routed.org"], "tcp-tls:common.dot.dns.yandex.net:853")
+
+        # Verify diagnostic tool matches both apex domain and subdomains
+        diag_apex = self.client.post("/api/tools/diagnostic", headers=TestBlockyDnsHub.headers, json={
+            "domain": "example-routed.org"
+        }).json()
+        self.assertIn("Domain Routing: Yandex DoT", diag_apex["rule_match"])
+
+        diag_sub = self.client.post("/api/tools/diagnostic", headers=TestBlockyDnsHub.headers, json={
+            "domain": "sub.example-routed.org"
+        }).json()
+        self.assertIn("Domain Routing: Yandex DoT", diag_sub["rule_match"])
+
+        # Insert a CONDITIONAL query log entry to verify log enrichment
+        from database import get_connection
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO log_entries (request_ts, client_ip, duration_ms, reason, response_type, question_name, question)
+            VALUES (datetime('now'), '192.168.1.105', 15, 'CONDITIONAL', 'CONDITIONAL', 'example-routed.org', 'example-routed.org');
+        """)
+        conn.commit()
+        conn.close()
+
+        log_res = self.client.get("/api/logs?search=example-routed.org", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(log_res.status_code, 200)
+        log_records = log_res.json().get("records", [])
+        self.assertTrue(len(log_records) > 0)
+        self.assertIn("tcp-tls:common.dot.dns.yandex.net:853", log_records[0]["reason"])
+        self.assertIn("Yandex DoT", log_records[0]["reason"])
+        print("[OK] Enriched CONDITIONAL query log verified:", log_records[0]["reason"])
+        print("[OK] Wildcard domain routing normalization & hierarchical matching verified")
+
+    def test_07c_smart_protocol_detection_and_normalization(self):
+        # Ensure test repeatability
+        from database import get_connection
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM upstreams WHERE endpoint = 'tcp-tls:dns.quad9.net:853';")
+        c.execute("DELETE FROM domain_routing WHERE domain_pattern = 'yandex-test.online';")
+        conn.commit()
+        conn.close()
+
+        # 1. Test adding route with misleading HTTPS DoT URL (exact user case)
+        add_route = self.client.post("/api/routing/add", headers=TestBlockyDnsHub.headers, json={
+            "domain_pattern": "yandex-test.online",
+            "resolver": "https://common.dot.dns.yandex.net/dns-query",
+            "tag": "Auto-Detect Test"
+        })
+        self.assertEqual(add_route.status_code, 200)
+        self.assertEqual(add_route.json()["normalized_resolver"], "tcp-tls:common.dot.dns.yandex.net:853")
+
+        # 2. Test adding upstream with tls:// scheme
+        add_up = self.client.post("/api/upstreams/add", headers=TestBlockyDnsHub.headers, json={
+            "name": "Quad9 TLS Test",
+            "endpoint": "tls://dns.quad9.net"
+        })
+        self.assertEqual(add_up.status_code, 200)
+        
+        # Verify in database that it was saved with protocol 'dot' and 'tcp-tls:dns.quad9.net:853'
+        list_up = self.client.get("/api/upstreams", headers=TestBlockyDnsHub.headers).json()["upstreams"]
+        matched_up = next((u for u in list_up if u["name"] == "Quad9 TLS Test"), None)
+        self.assertIsNotNone(matched_up)
+        self.assertEqual(matched_up["protocol"], "dot")
+        self.assertEqual(matched_up["endpoint"], "tcp-tls:dns.quad9.net:853")
+
+        # 3. Test Probe endpoint
+        probe_res = self.client.post("/api/upstreams/probe", headers=TestBlockyDnsHub.headers, json={
+            "endpoint": "https://common.dot.dns.yandex.net/dns-query"
+        })
+        self.assertEqual(probe_res.status_code, 200)
+        probe_data = probe_res.json()
+        self.assertEqual(probe_data["protocol"], "dot")
+        self.assertEqual(probe_data["endpoint"], "tcp-tls:common.dot.dns.yandex.net:853")
+        self.assertEqual(probe_data["status"], "online")
+        print("[OK] Smart protocol auto-detection & DoT/DoH/UDP normalization verified")
+
+    def test_07d_in_memory_routing_cache(self):
+        from routing_cache import get_cached_routing_rules, reload_routing_cache
+        
+        # 1. Verify memory cache contains active rules
+        cached_rules = get_cached_routing_rules()
+        self.assertIsInstance(cached_rules, list)
+        self.assertTrue(len(cached_rules) > 0)
+        self.assertTrue(any("example-routed.org" in r["pattern"] for r in cached_rules))
+        
+        # 2. Add rule and verify memory cache is automatically refreshed
+        add_res = self.client.post("/api/routing/add", headers=TestBlockyDnsHub.headers, json={
+            "domain_pattern": "speedtest-fast.io",
+            "resolver": "tcp-tls:1.1.1.1:853",
+            "tag": "Cloudflare Fast"
+        })
+        self.assertEqual(add_res.status_code, 200)
+        
+        updated_cache = get_cached_routing_rules()
+        matched = next((r for r in updated_cache if r["pattern"] == "speedtest-fast.io"), None)
+        self.assertIsNotNone(matched)
+        self.assertEqual(matched["resolver"], "tcp-tls:1.1.1.1:853")
+        self.assertEqual(matched["tag"], "Cloudflare Fast")
+        
+        # 3. Delete rule and verify memory cache removes it immediately
+        del_res = self.client.delete("/api/routing/speedtest-fast.io", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(del_res.status_code, 200)
+        
+        cleared_cache = get_cached_routing_rules()
+        self.assertFalse(any(r["pattern"] == "speedtest-fast.io" for r in cleared_cache))
+        print("[OK] In-memory routing cache synchronization & zero-SQL lookups verified")
 
     def test_08_tools_diagnostic(self):
         diag_res = self.client.post("/api/tools/diagnostic", headers=TestBlockyDnsHub.headers, json={
@@ -424,7 +563,7 @@ class TestBlockyDnsHub(unittest.TestCase):
         # 1. Test updating system settings with log_ptr_queries = False (default)
         set_res1 = self.client.post("/api/control/settings", headers=TestBlockyDnsHub.headers, json={
             "log_retention_days": 7,
-            "router_ip": "10.0.0.1",
+            "router_ip": "192.168.1.1",
             "log_ptr_queries": False
         })
         self.assertEqual(set_res1.status_code, 200)
@@ -436,12 +575,12 @@ class TestBlockyDnsHub(unittest.TestCase):
         self.assertIn("ignore:", cfg)
         self.assertIn("sudn: true", cfg)
         self.assertIn("in-addr.arpa", cfg)
-        self.assertIn("0.0.10.in-addr.arpa", cfg) # Router subnet PTR mapping verified
+        self.assertIn("1.168.192.in-addr.arpa", cfg) # Router subnet PTR mapping verified
 
         # 2. Test updating system settings with log_ptr_queries = True (user enabled)
         set_res2 = self.client.post("/api/control/settings", headers=TestBlockyDnsHub.headers, json={
             "log_retention_days": 7,
-            "router_ip": "10.0.0.1",
+            "router_ip": "192.168.1.1",
             "log_ptr_queries": True
         })
         self.assertEqual(set_res2.status_code, 200)
@@ -452,7 +591,7 @@ class TestBlockyDnsHub(unittest.TestCase):
         # Reset to False (default recommended)
         self.client.post("/api/control/settings", headers=TestBlockyDnsHub.headers, json={
             "log_retention_days": 7,
-            "router_ip": "10.0.0.1",
+            "router_ip": "192.168.1.1",
             "log_ptr_queries": False
         })
 
@@ -462,17 +601,17 @@ class TestBlockyDnsHub(unittest.TestCase):
         c = conn.cursor()
         c.execute("""
         INSERT INTO log_entries (request_ts, client_ip, question_name, question, response_type, reason)
-        VALUES (datetime('now'), '10.0.0.15', '250.0.0.10.in-addr.arpa', '250.0.0.10.in-addr.arpa', 'SPECIAL', 'Special-Use Domain Name');
+        VALUES (datetime('now'), '192.168.1.15', '15.1.168.192.in-addr.arpa', '15.1.168.192.in-addr.arpa', 'SPECIAL', 'Special-Use Domain Name');
         """)
         conn.commit()
         conn.close()
 
         # Query with include_ptr = False (default) -> should NOT return the special/PTR query
-        logs_hidden = self.client.get("/api/logs?include_ptr=false&search=250.0.0.10", headers=TestBlockyDnsHub.headers).json()
+        logs_hidden = self.client.get("/api/logs?include_ptr=false&search=1.168.192", headers=TestBlockyDnsHub.headers).json()
         self.assertEqual(logs_hidden["total_records"], 0)
 
         # Query with include_ptr = True -> should return the query
-        logs_shown = self.client.get("/api/logs?include_ptr=true&search=250.0.0.10", headers=TestBlockyDnsHub.headers).json()
+        logs_shown = self.client.get("/api/logs?include_ptr=true&search=1.168.192", headers=TestBlockyDnsHub.headers).json()
         self.assertGreaterEqual(logs_shown["total_records"], 1)
 
         # 4. Test Domain-Specific Routing add and delete by string pattern
@@ -498,7 +637,7 @@ class TestBlockyDnsHub(unittest.TestCase):
         self.assertEqual(list_del.status_code, 200)
 
         # 6. Test Client Devices PTR trigger
-        ptr_res = self.client.post("/api/devices/resolve-ptr/10.0.0.15", headers=TestBlockyDnsHub.headers)
+        ptr_res = self.client.post("/api/devices/resolve-ptr/192.168.1.15", headers=TestBlockyDnsHub.headers)
         self.assertEqual(ptr_res.status_code, 200)
         self.assertTrue(ptr_res.json()["success"])
 

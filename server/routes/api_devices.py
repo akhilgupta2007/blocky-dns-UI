@@ -30,7 +30,7 @@ def list_devices():
         MAX(l.request_ts)
     FROM log_entries l
     LEFT JOIN devices d ON l.client_ip = d.client_ip
-    WHERE d.client_ip IS NULL
+    WHERE d.client_ip IS NULL AND l.client_ip IS NOT NULL AND TRIM(l.client_ip) != ''
     GROUP BY l.client_ip;
     """)
     conn.commit()

@@ -18,22 +18,56 @@ async function loadDevices() {
       const pct = d.total_queries > 0 ? Math.round((d.blocked_queries / d.total_queries) * 100) : 0;
 
       return `
-        <tr>
-          <td><span style="font-size: 1.3rem;">${icon}</span></td>
-          <td><code style="color: var(--accent-cyan); font-weight: 600;">${d.client_ip}</code></td>
-          <td style="color: var(--text-muted); font-size: 0.85rem;">${d.hostname || "<span style='color: var(--text-dim)'>Unknown</span>"}</td>
-          <td>
+        <tr class="device-card-row">
+          <!-- MOBILE VIEW CARD -->
+          <td class="mobile-only">
+            <div class="device-card-header">
+              <div class="device-title-box">
+                <span>${icon}</span>
+                <span style="font-weight: 700; color: var(--text-main);">${d.friendly_name || d.hostname || d.client_ip}</span>
+              </div>
+              <span class="pill" style="background: rgba(255,255,255,0.08); font-family: monospace; font-size: 0.72rem;">${d.group_name || 'default'}</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-top: 4px;">
+              <code style="color: var(--accent-cyan); font-weight: 600; font-family: monospace;">${d.client_ip}</code>
+              <span style="color: var(--text-dim); font-size: 0.76rem;">${d.hostname || 'Unknown Host'}</span>
+            </div>
+            <div class="device-stats-grid" style="margin-top: 8px;">
+              <div>
+                <span style="font-size: 0.72rem; color: var(--text-dim); display: block;">Total Queries</span>
+                <strong style="color: var(--text-main); font-size: 0.88rem;">${(d.total_queries || 0).toLocaleString()}</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.72rem; color: var(--text-dim); display: block;">Blocked Rate</span>
+                <span class="pill blocked" style="font-size: 0.72rem; padding: 1px 6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="device-actions-row" style="margin-top: 10px;">
+              <input type="text" class="form-input" style="flex: 1; font-size: 0.82rem; padding: 6px 8px;" 
+                value="${d.friendly_name || ''}" 
+                placeholder="Set Nickname..."
+                onchange="saveDeviceNickname('${d.client_ip}', this.value, '${d.icon}', '${d.group_name || 'default'}')">
+              <button class="btn btn-secondary btn-sm" onclick="triggerDevicePtr('${d.client_ip}')" title="Query Router PTR">🔍 PTR</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteDevice('${d.client_ip}')" title="Remove Device">✕</button>
+            </div>
+          </td>
+
+          <!-- DESKTOP VIEW CELLS -->
+          <td class="desktop-only"><span style="font-size: 1.3rem;">${icon}</span></td>
+          <td class="desktop-only"><code style="color: var(--accent-cyan); font-weight: 600;">${d.client_ip}</code></td>
+          <td class="desktop-only" style="color: var(--text-muted); font-size: 0.85rem;">${d.hostname || "<span style='color: var(--text-dim)'>Unknown</span>"}</td>
+          <td class="desktop-only">
             <input type="text" class="form-input" style="padding: 4px 8px; font-size: 0.85rem; width: 180px;" 
               value="${d.friendly_name || ''}" 
               placeholder="Set Nickname..."
               onchange="saveDeviceNickname('${d.client_ip}', this.value, '${d.icon}', '${d.group_name || 'default'}')">
           </td>
-          <td>
+          <td class="desktop-only">
             <span class="pill" style="background: rgba(255,255,255,0.06); font-family: monospace;">${d.group_name || 'default'}</span>
           </td>
-          <td style="font-weight: 600;">${(d.total_queries || 0).toLocaleString()}</td>
-          <td><span class="pill blocked">${pct}%</span></td>
-          <td>
+          <td class="desktop-only" style="font-weight: 600;">${(d.total_queries || 0).toLocaleString()}</td>
+          <td class="desktop-only"><span class="pill blocked">${pct}%</span></td>
+          <td class="desktop-only">
             <button class="btn btn-secondary btn-sm" onclick="triggerDevicePtr('${d.client_ip}')" title="Query Router PTR">🔍 PTR</button>
             <button class="btn btn-secondary btn-sm" onclick="deleteDevice('${d.client_ip}')" title="Remove Device" style="color: #f87171; margin-left: 4px;">✕</button>
           </td>

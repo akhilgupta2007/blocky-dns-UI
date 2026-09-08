@@ -47,26 +47,55 @@ function renderUpstreams(upstreams) {
   if (!tbody) return;
 
   tbody.innerHTML = upstreams.map(u => {
+    const protoUpper = (u.protocol || "doh").toUpperCase();
+    const latBadge = (u.last_latency_ms != null && u.last_latency_ms > 0)
+      ? `<span style="font-family: monospace; font-size: 0.82rem; font-weight: 600; color: var(--accent-green); display: inline-flex; align-items: center; gap: 4px;" title="Measured round-trip latency"><span>⚡</span> ${Math.round(u.last_latency_ms)} ms</span>`
+      : `<span style="color: var(--text-dim); font-size: 0.76rem;">Pending</span>`;
+
     return `
-      <tr>
-        <td style="font-weight: 600;">
+      <tr class="settings-upstream-card-row">
+        <!-- MOBILE VIEW -->
+        <td class="mobile-only">
+          <div class="upstream-card-header">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">
+              ${u.name}
+              ${u.is_custom ? `<span class="pill" style="margin-left: 6px; font-size: 0.68rem; background: rgba(168, 85, 247, 0.18); color: #c084fc;">Custom</span>` : ""}
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="pill" style="background: rgba(255,255,255,0.06); font-size: 0.7rem; text-transform: uppercase;">${protoUpper}</span>
+              ${u.is_custom ? `<button class="btn btn-icon" title="Delete custom resolver" onclick="handleDeleteUpstream(${u.id}, '${u.name.replace(/'/g, "\\'")}')" style="color: var(--accent-red); padding: 2px 6px;">✕</button>` : ""}
+            </div>
+          </div>
+          <div class="upstream-details-box" style="margin-top: 8px;">
+            <code style="font-size: 0.78rem; color: var(--accent-cyan); word-break: break-all; font-family: monospace;">${u.endpoint}</code>
+            <div class="upstream-controls-line">
+              <div>${latBadge}</div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label class="switch">
+                  <input type="checkbox" ${u.enabled ? "checked" : ""} onchange="handleToggleUpstream(${u.id}, this.checked)">
+                  <span class="slider"></span>
+                </label>
+                <span style="font-size: 0.74rem; font-weight: 500; color: ${u.enabled ? 'var(--accent-green)' : 'var(--text-dim)'};">${u.enabled ? 'Enabled' : 'Disabled'}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <!-- DESKTOP VIEW -->
+        <td class="desktop-only" style="font-weight: 600;">
           ${u.name}
           ${u.is_custom ? `<span class="pill" style="margin-left: 6px; font-size: 0.7rem; background: rgba(168, 85, 247, 0.18); color: #c084fc;">Custom</span>` : ""}
         </td>
-        <td><code style="font-size: 0.8rem; color: var(--accent-cyan); word-break: break-all;">${u.endpoint}</code></td>
-        <td><span class="pill" style="background: rgba(255,255,255,0.06); text-transform: uppercase;">${u.protocol}</span></td>
-        <td>
-          ${(u.last_latency_ms != null && u.last_latency_ms > 0)
-            ? `<span style="font-family: monospace; font-size: 0.82rem; font-weight: 600; color: var(--accent-green); display: inline-flex; align-items: center; gap: 4px;" title="Measured round-trip latency"><span>⚡</span> ${Math.round(u.last_latency_ms)} ms</span>`
-            : `<span style="color: var(--text-dim); font-size: 0.76rem;">Pending</span>`}
-        </td>
-        <td>
+        <td class="desktop-only"><code style="font-size: 0.8rem; color: var(--accent-cyan); word-break: break-all;">${u.endpoint}</code></td>
+        <td class="desktop-only"><span class="pill" style="background: rgba(255,255,255,0.06); text-transform: uppercase;">${protoUpper}</span></td>
+        <td class="desktop-only">${latBadge}</td>
+        <td class="desktop-only">
           <label class="switch">
             <input type="checkbox" ${u.enabled ? "checked" : ""} onchange="handleToggleUpstream(${u.id}, this.checked)">
             <span class="slider"></span>
           </label>
         </td>
-        <td style="text-align: right;">
+        <td class="desktop-only" style="text-align: right;">
           ${u.is_custom ? `<button class="btn btn-icon" title="Delete custom resolver" onclick="handleDeleteUpstream(${u.id}, '${u.name.replace(/'/g, "\\'")}')" style="color: var(--accent-red); padding: 4px 8px;">✕</button>` : ""}
         </td>
       </tr>
@@ -184,11 +213,39 @@ async function handleToggleUpstream(id, enabled) {
   }
 }
 
+function autoDetectUpstreamProtocol(val) {
+  const ep = (val || "").trim();
+  if (!ep) return null;
+  if (ep.startsWith("tls://") || ep.startsWith("tcp-tls:") || ep.startsWith("dot://") || ep.includes(":853") || ep.toLowerCase().includes(".dot.")) {
+    return "dot";
+  }
+  if (/^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(ep)) {
+    return ep.includes(":853") ? "dot" : "udp";
+  }
+  if (ep.startsWith("https://") || ep.startsWith("http://") || ep.includes("/")) {
+    return "doh";
+  }
+  return null;
+}
+
 async function handleAddUpstream(event) {
   event.preventDefault();
   const name = document.getElementById("newUpstreamName").value.trim();
   const endpoint = document.getElementById("newUpstreamEndpoint").value.trim();
-  const protocol = document.getElementById("newUpstreamProtocol").value;
+  let protocol = document.getElementById("newUpstreamProtocol").value;
+  
+  // Smart auto-detection fallback if user left default
+  const detectedProto = autoDetectUpstreamProtocol(endpoint);
+  if (detectedProto && protocol !== detectedProto) {
+    protocol = detectedProto;
+    const protoSelect = document.getElementById("newUpstreamProtocol");
+    if (protoSelect) protoSelect.value = detectedProto;
+  }
+
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Adding...");
+  }
 
   try {
     const res = await apiRequest("/api/upstreams/add", {
@@ -196,13 +253,17 @@ async function handleAddUpstream(event) {
       body: JSON.stringify({ name, endpoint, protocol })
     });
     if (res && res.success) {
-      showToast(`Added custom upstream: ${name}`);
+      showToast(`Added custom upstream: ${name || endpoint} [${(protocol || 'doh').toUpperCase()}]`);
       document.getElementById("newUpstreamName").value = "";
       document.getElementById("newUpstreamEndpoint").value = "";
       loadSettingsView();
     }
   } catch (err) {
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -211,6 +272,10 @@ async function handleSaveSettings(event) {
   const retention = parseInt(document.getElementById("settingRetention").value, 10);
   const routerIp = document.getElementById("settingRouterIp").value.trim();
   const logPtr = document.getElementById("settingLogPtrQueries")?.checked || false;
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Saving...");
+  }
 
   try {
     const res = await apiRequest("/api/control/settings", {
@@ -226,6 +291,10 @@ async function handleSaveSettings(event) {
     }
   } catch (err) {
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -486,6 +555,10 @@ async function handleSaveIntegration(event) {
   const mode = document.querySelector('input[name="integrationModeRadio"]:checked')?.value || "all-in-one";
   const apiUrl = (document.getElementById("settingBlockyApiUrl")?.value || "").trim();
   const configPath = (document.getElementById("settingBlockyConfigPath")?.value || "").trim();
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Saving Architecture...");
+  }
 
   try {
     const res = await apiRequest("/api/control/integration", {
@@ -503,6 +576,10 @@ async function handleSaveIntegration(event) {
     }
   } catch (err) {
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -542,6 +619,10 @@ async function handleSaveCachingSettings(event) {
   const negTtl = parseInt(document.getElementById("settingCacheNegTtl")?.value || "1800", 10);
   const prefetchingEnabled = document.getElementById("togglePrefetchingEnabled")?.checked ?? true;
   const prefetchThreshold = parseInt(document.getElementById("settingPrefetchThreshold")?.value || "5", 10);
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Saving Cache...");
+  }
 
   try {
     const res = await apiRequest("/api/control/caching", {
@@ -562,6 +643,10 @@ async function handleSaveCachingSettings(event) {
     }
   } catch (err) {
     console.error("Failed to save caching settings:", err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 

@@ -16,17 +16,38 @@ class SettingsUpdateRequest(BaseModel):
 
 @router.get("/status")
 async def get_blocking_status():
-    return await check_blocky_status()
+    status = await check_blocky_status()
+    if not status.get("online"):
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = 'blocking_enabled';")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            status["blocking_enabled"] = (row["value"] == "true")
+    return status
 
 @router.post("/enable")
 async def enable():
     ok = await enable_blocking()
-    return {"success": ok}
+    await flush_cache()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocking_enabled', 'true');")
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @router.post("/pause")
 async def pause(req: PauseRequest):
     ok = await pause_blocking(req.duration)
-    return {"success": ok, "duration": req.duration}
+    await flush_cache()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocking_enabled', 'false');")
+    conn.commit()
+    conn.close()
+    return {"success": True, "duration": req.duration}
 
 @router.post("/flush-cache")
 async def flush_dns_cache():

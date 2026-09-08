@@ -1,4 +1,3 @@
-import datetime
 from fastapi import APIRouter, Depends
 from database import get_connection
 from auth import get_current_user
@@ -21,19 +20,32 @@ async def get_summary():
     WHERE request_ts >= datetime('now', '-24 hours');
     """)
     row = cursor.fetchone()
-    total_q = row["total_queries"] or 0
-    blocked_q = row["blocked_queries"] or 0
+    total_q = (row["total_queries"] if row else 0) or 0
+    blocked_q = (row["blocked_queries"] if row else 0) or 0
     blocked_pct = round((blocked_q / total_q * 100), 1) if total_q > 0 else 0.0
+    active_devices = (row["active_clients"] if row else 0) or 0
 
     # Total active rules from enabled blocklists
     cursor.execute("SELECT SUM(rule_count) as rules_total FROM blocklists WHERE enabled = 1;")
     rule_row = cursor.fetchone()
-    active_rules = rule_row["rules_total"] or 0
+    active_rules = (rule_row["rules_total"] if rule_row else 0) or 0
 
     # Upstream latency average
     cursor.execute("SELECT AVG(last_latency_ms) as avg_lat FROM upstreams WHERE enabled = 1 AND last_latency_ms > 0;")
     lat_row = cursor.fetchone()
     avg_latency = round(lat_row["avg_lat"], 1) if lat_row and lat_row["avg_lat"] else 12.4
+
+    # Query distribution by response type (RESOLVED, BLOCKED, CACHED, etc.) in last 24h
+    cursor.execute("""
+    SELECT 
+        response_type,
+        COUNT(*) as count
+    FROM log_entries
+    WHERE request_ts >= datetime('now', '-24 hours')
+    GROUP BY response_type;
+    """)
+    dist_rows = cursor.fetchall()
+    query_distribution = {r["response_type"]: r["count"] for r in dist_rows}
 
     conn.close()
 
@@ -44,11 +56,12 @@ async def get_summary():
         "total_queries_24h": total_q,
         "blocked_queries_24h": blocked_q,
         "blocked_percent": blocked_pct,
-        "active_devices_count": row["active_clients"] or 0,
+        "active_devices_count": active_devices,
         "active_rules_count": active_rules,
         "upstream_latency_ms": avg_latency,
         "blocky_online": blocky_stat.get("online", True),
-        "blocking_enabled": blocky_stat.get("blocking_enabled", True)
+        "blocking_enabled": blocky_stat.get("blocking_enabled", True),
+        "query_distribution": query_distribution
     }
 
 @router.get("/timeline")
@@ -81,27 +94,43 @@ def get_top_domains():
     conn = get_connection()
     cursor = conn.cursor()
 
+    try:
+        cursor.execute("PRAGMA table_info(log_entries);")
+        cols = {c["name"] for c in cursor.fetchall()}
+    except Exception:
+        cols = set()
+
+    if not cols:
+        conn.close()
+        return {"top_allowed": [], "top_blocked": []}
+
+    q_col = "question_name" if "question_name" in cols else ("question" if "question" in cols else "''")
+    if "question_name" in cols and "question" in cols:
+        q_expr = "COALESCE(NULLIF(question_name, ''), NULLIF(question, ''), '')"
+    else:
+        q_expr = f"COALESCE({q_col}, '')"
+
     # Top 10 allowed
-    cursor.execute("""
-    SELECT COALESCE(question_name, question) as domain, COUNT(*) as count
+    cursor.execute(f"""
+    SELECT {q_expr} as domain, COUNT(*) as count
     FROM log_entries
     WHERE response_type != 'BLOCKED' AND request_ts >= datetime('now', '-24 hours')
     GROUP BY domain
     ORDER BY count DESC
     LIMIT 10;
     """)
-    allowed = [dict(r) for r in cursor.fetchall()]
+    allowed = [dict(r) for r in cursor.fetchall() if r["domain"]]
 
     # Top 10 blocked
-    cursor.execute("""
-    SELECT COALESCE(question_name, question) as domain, COUNT(*) as count
+    cursor.execute(f"""
+    SELECT {q_expr} as domain, COUNT(*) as count
     FROM log_entries
     WHERE response_type = 'BLOCKED' AND request_ts >= datetime('now', '-24 hours')
     GROUP BY domain
     ORDER BY count DESC
     LIMIT 10;
     """)
-    blocked = [dict(r) for r in cursor.fetchall()]
+    blocked = [dict(r) for r in cursor.fetchall() if r["domain"]]
 
     conn.close()
     return {"top_allowed": allowed, "top_blocked": blocked}

@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, restart_blocky_container, flush_cache
+from blocky_client import sync_config_from_db, schedule_blocky_restart
+from resolver_utils import normalize_resolver
+from routing_cache import reload_routing_cache
 
 router = APIRouter(prefix="/api/routing", tags=["routing"], dependencies=[Depends(get_current_user)])
 
@@ -27,9 +29,12 @@ def list_routings():
 @router.post("/add")
 async def add_routing(req: AddRoutingRequest):
     pattern = req.domain_pattern.strip().lower()
-    resolver = req.resolver.strip()
-    if not pattern or not resolver:
+    raw_resolver = req.resolver.strip()
+    if not pattern or not raw_resolver:
         raise HTTPException(status_code=400, detail="Pattern and resolver required")
+
+    # Smart auto-detection and normalization for Blocky syntax (DoT, DoH, UDP)
+    resolver, _ = normalize_resolver(raw_resolver)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -41,9 +46,9 @@ async def add_routing(req: AddRoutingRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
-    await flush_cache()
-    return {"success": True}
+    schedule_blocky_restart()
+    reload_routing_cache()
+    return {"success": True, "normalized_resolver": resolver}
 
 @router.post("/toggle")
 async def toggle_routing(req: ToggleRoutingRequest):
@@ -54,8 +59,8 @@ async def toggle_routing(req: ToggleRoutingRequest):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
-    await flush_cache()
+    schedule_blocky_restart()
+    reload_routing_cache()
     return {"success": True}
 
 @router.delete("/{target}")
@@ -71,6 +76,6 @@ async def delete_routing(target: str):
     conn.close()
 
     sync_config_from_db()
-    await restart_blocky_container()
-    await flush_cache()
+    schedule_blocky_restart()
+    reload_routing_cache()
     return {"success": True}

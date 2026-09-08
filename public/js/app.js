@@ -2,7 +2,7 @@
 let currentView = "dashboard";
 let pendingRequests = 0;
 
-function updateRequestIndicator(delta, method = "GET") {
+function updateRequestIndicator(delta, method = "GET", endpoint = "") {
   pendingRequests = Math.max(0, pendingRequests + delta);
 
   let bar = document.getElementById("globalProgressBar");
@@ -29,7 +29,32 @@ function updateRequestIndicator(delta, method = "GET") {
 
     const isMutating = ["POST", "PUT", "DELETE", "PATCH"].includes((method || "").toUpperCase());
     if (isMutating) {
-      document.getElementById("actionStatusText").textContent = "Processing request...";
+      let msg = "Processing request...";
+      const ep = endpoint || "";
+      if (ep.includes("/control/pause")) msg = "Pausing DNS protection...";
+      else if (ep.includes("/control/enable")) msg = "Resuming DNS shield...";
+      else if (ep.includes("refresh")) msg = "Compiling & reloading all blocklists...";
+      else if (ep.includes("/blocklists/toggle")) msg = "Updating blocklist...";
+      else if (ep.includes("/blocklists/add")) msg = "Adding blocklist subscription...";
+      else if (ep.includes("/rules/add")) msg = "Compiling domain rule...";
+      else if (ep.includes("/rules/delete")) msg = "Removing domain rule...";
+      else if (ep.includes("/rules/import-adguard")) msg = "Parsing & importing rules...";
+      else if (ep.includes("/services/toggle")) msg = "Updating blocked service...";
+      else if (ep.includes("/local-dns/add")) msg = "Registering local DNS record...";
+      else if (ep.includes("/local-dns/delete")) msg = "Removing local DNS record...";
+      else if (ep.includes("/routing/add")) msg = "Saving SmartDNS routing rule...";
+      else if (ep.includes("/routing/delete")) msg = "Removing routing rule...";
+      else if (ep.includes("/upstreams/add")) msg = "Saving upstream resolver...";
+      else if (ep.includes("/tools/benchmark")) msg = "Measuring upstream round-trip latency...";
+      else if (ep.includes("/tools/diagnostic")) msg = "Testing domain query...";
+      else if (ep.includes("/tools/dnssec-inspect")) msg = "Validating DNSSEC cryptography...";
+      else if (ep.includes("restart-engine")) msg = "Restarting Blocky engine...";
+      else if (ep.includes("/auth/change-password")) msg = "Updating password...";
+      else if (ep.includes("/control/settings")) msg = "Synchronizing configuration...";
+      else if (ep.includes("/tools/caching")) msg = "Saving cache & prefetch settings...";
+      else if (ep.includes("/tools/integration")) msg = "Saving integration architecture...";
+
+      document.getElementById("actionStatusText").textContent = msg;
       pill.classList.add("active");
     }
   } else {
@@ -38,14 +63,34 @@ function updateRequestIndicator(delta, method = "GET") {
     bar.classList.add("done");
     pill.classList.remove("active");
     setTimeout(() => {
-      if (pendingRequests === 0) bar.classList.remove("done");
-    }, 350);
+      if (pendingRequests === 0) {
+        bar.classList.remove("loading", "done");
+      }
+    }, 450);
   }
 }
 
+function setButtonLoading(btn, isLoading, loadingText = "Saving...") {
+  if (!btn) return;
+  if (isLoading) {
+    btn.dataset.origHtml = btn.innerHTML;
+    btn.classList.add("is-loading");
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span> ${loadingText}`;
+  } else {
+    btn.classList.remove("is-loading");
+    btn.disabled = false;
+    if (btn.dataset.origHtml) {
+      btn.innerHTML = btn.dataset.origHtml;
+      delete btn.dataset.origHtml;
+    }
+  }
+}
+window.setButtonLoading = setButtonLoading;
+
 async function apiRequest(endpoint, options = {}) {
   const method = (options.method || "GET").toUpperCase();
-  updateRequestIndicator(1, method);
+  updateRequestIndicator(1, method, endpoint);
   try {
     const res = await fetch(endpoint, {
       ...options,
@@ -61,16 +106,23 @@ async function apiRequest(endpoint, options = {}) {
       return null;
     }
 
-    const data = await res.json();
+    let data;
+    const text = await res.text();
+    try {
+      data = JSON.parse(text);
+    } catch (jsonErr) {
+      data = { detail: text || `HTTP ${res.status} ${res.statusText}` };
+    }
+
     if (!res.ok) {
-      throw new Error(data.detail || "Request failed");
+      throw new Error(data.detail || `Request failed with HTTP status ${res.status}`);
     }
     return data;
   } catch (err) {
     showToast(err.message, "error");
     throw err;
   } finally {
-    updateRequestIndicator(-1, method);
+    updateRequestIndicator(-1, method, endpoint);
   }
 }
 
@@ -109,31 +161,154 @@ function closeMobileSidebar() {
 window.toggleMobileSidebar = toggleMobileSidebar;
 window.closeMobileSidebar = closeMobileSidebar;
 
-function switchView(viewName) {
-  currentView = viewName;
+let currentProtectionTab = "adlists";
+let currentRoutingTab = "localDns";
+let currentSettingsTab = "resolvers";
+
+function switchView(viewName, subTab = null) {
   closeMobileSidebar();
 
-  // Update Nav items
-  document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-  const activeNav = document.getElementById("nav" + viewName.charAt(0).toUpperCase() + viewName.slice(1));
+  // Resolve aliases
+  let canonicalView = viewName;
+  let targetSubTab = subTab;
+
+  if (viewName === "blocklists" || viewName === "protection") {
+    canonicalView = "protection";
+    if (!targetSubTab) targetSubTab = currentProtectionTab || "adlists";
+  } else if (viewName === "blockedServices") {
+    canonicalView = "protection";
+    targetSubTab = "blockedServices";
+  } else if (viewName === "localDns") {
+    canonicalView = "routing";
+    targetSubTab = "localDns";
+  } else if (viewName === "tools") {
+    canonicalView = "settings";
+    targetSubTab = "tools";
+  } else if (viewName === "routing") {
+    if (!targetSubTab) targetSubTab = currentRoutingTab || "localDns";
+  } else if (viewName === "settings") {
+    if (!targetSubTab) targetSubTab = currentSettingsTab || "resolvers";
+  }
+
+  currentView = canonicalView;
+
+  // Update Desktop & Mobile Nav items
+  document.querySelectorAll(".nav-item, .bottom-nav-item").forEach(el => el.classList.remove("active"));
+
+  const navSuffix = canonicalView.charAt(0).toUpperCase() + canonicalView.slice(1);
+  const activeNav = document.getElementById("nav" + navSuffix);
+  const activeBottomNav = document.getElementById("bottomNav" + navSuffix);
   if (activeNav) activeNav.classList.add("active");
+  if (activeBottomNav) activeBottomNav.classList.add("active");
+
+  // Support legacy nav item IDs if present
+  if (viewName === "blocklists") {
+    const legacyNav = document.getElementById("navBlocklists");
+    if (legacyNav) legacyNav.classList.add("active");
+  }
 
   // Update Sections
   document.querySelectorAll(".view-section").forEach(el => el.classList.remove("active"));
-  const activeSection = document.getElementById("view" + viewName.charAt(0).toUpperCase() + viewName.slice(1));
+  const activeSection = document.getElementById("view" + navSuffix);
   if (activeSection) activeSection.classList.add("active");
 
+  // Activate subtab if applicable
+  if (canonicalView === "protection" && targetSubTab) {
+    switchProtectionSubTab(targetSubTab, false);
+  } else if (canonicalView === "routing" && targetSubTab) {
+    switchRoutingSubTab(targetSubTab, false);
+  } else if (canonicalView === "settings" && targetSubTab) {
+    switchSettingsSubTab(targetSubTab, false);
+  }
+
   // Trigger view-specific loads
-  if (viewName === "dashboard") loadDashboard();
-  if (viewName === "queryLog") refreshQueryLogs();
-  if (viewName === "blocklists") loadBlocklistsAndRules();
-  if (viewName === "devices") loadDevices();
-  if (viewName === "localDns") loadLocalDns();
-  if (viewName === "routing") loadRouting();
-  if (viewName === "tools") loadToolsInfo();
-  if (viewName === "settings") loadSettingsView();
-  if (viewName === "blockedServices") loadBlockedServices();
+  if (canonicalView === "dashboard") loadDashboard();
+  if (canonicalView === "queryLog") refreshQueryLogs();
+  if (canonicalView === "protection") {
+    if (targetSubTab === "blockedServices") {
+      loadBlockedServices();
+    } else {
+      loadBlocklistsAndRules();
+    }
+  }
+  if (canonicalView === "devices") loadDevices();
+  if (canonicalView === "routing") {
+    if (targetSubTab === "smartDns") {
+      loadRouting();
+    } else {
+      loadLocalDns();
+    }
+  }
+  if (canonicalView === "settings") {
+    if (targetSubTab === "tools") {
+      loadToolsInfo();
+    } else {
+      loadSettingsView();
+    }
+  }
 }
+
+function switchProtectionSubTab(tabName, shouldLoad = true) {
+  currentProtectionTab = tabName;
+  document.querySelectorAll("#viewProtection .subnav-pill").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#viewProtection .sub-pane").forEach(p => p.classList.remove("active"));
+
+  const btn = document.getElementById("subtabBtn" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  const pane = document.getElementById("subpane" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (btn) btn.classList.add("active");
+  if (pane) pane.classList.add("active");
+
+  if (shouldLoad) {
+    if (tabName === "blockedServices") {
+      loadBlockedServices();
+    } else {
+      loadBlocklistsAndRules();
+    }
+  }
+}
+
+function switchRoutingSubTab(tabName, shouldLoad = true) {
+  currentRoutingTab = tabName;
+  document.querySelectorAll("#viewRouting .subnav-pill").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#viewRouting .sub-pane").forEach(p => p.classList.remove("active"));
+
+  const btn = document.getElementById("subtabBtn" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  const pane = document.getElementById("subpane" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (btn) btn.classList.add("active");
+  if (pane) pane.classList.add("active");
+
+  if (shouldLoad) {
+    if (tabName === "localDns") {
+      loadLocalDns();
+    } else if (tabName === "smartDns") {
+      loadRouting();
+    }
+  }
+}
+
+function switchSettingsSubTab(tabName, shouldLoad = true) {
+  currentSettingsTab = tabName;
+  document.querySelectorAll("#viewSettings .subnav-pill").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#viewSettings .sub-pane").forEach(p => p.classList.remove("active"));
+
+  const btn = document.getElementById("subtabBtn" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  const pane = document.getElementById("subpane" + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+  if (btn) btn.classList.add("active");
+  if (pane) pane.classList.add("active");
+
+  if (shouldLoad) {
+    if (tabName === "tools") {
+      loadToolsInfo();
+    } else {
+      loadSettingsView();
+    }
+  }
+}
+
+window.switchView = switchView;
+window.switchProtectionSubTab = switchProtectionSubTab;
+window.switchRoutingSubTab = switchRoutingSubTab;
+window.switchSettingsSubTab = switchSettingsSubTab;
 
 function pauseBlockingPrompt() {
   document.getElementById("pauseModal").classList.add("active");
@@ -151,7 +326,7 @@ async function executePause(duration) {
       body: JSON.stringify({ duration })
     });
     if (res && res.success) {
-      showToast(`DNS Blocking paused for ${duration}`);
+      showToast(`DNS Shield paused for ${duration} (Cache flushed)`);
       updateBlockingBadge(false);
     }
   } catch (err) {
@@ -161,7 +336,11 @@ async function executePause(duration) {
 
 async function triggerListRefresh() {
   const btn = document.getElementById("btnRefreshAll");
-  if (btn) btn.disabled = true;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Compiling...");
+  } else if (btn) {
+    btn.disabled = true;
+  }
   showToast("Recompiling and refreshing all blocklists...");
   try {
     const res = await apiRequest("/api/blocklists/refresh", { method: "POST" });
@@ -172,7 +351,11 @@ async function triggerListRefresh() {
   } catch (err) {
     console.error(err);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    } else if (btn) {
+      btn.disabled = false;
+    }
   }
 }
 

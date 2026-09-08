@@ -23,7 +23,7 @@ if [ ! -f "docker-compose.yml" ]; then
     if ! command -v git >/dev/null 2>&1; then
       apt-get update -y && apt-get install -y git
     fi
-    REPO_URL="${BLOCKY_REPO_URL:-https://github.com/akhil/blocky-dns-UI.git}"
+    REPO_URL="${BLOCKY_REPO_URL:-https://github.com/akhilgupta2007/blocky-dns-UI.git}"
     git clone "$REPO_URL" "$INSTALL_DIR" || true
     cd "$INSTALL_DIR"
   fi

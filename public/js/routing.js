@@ -28,6 +28,7 @@ async function populateRoutingPresetsAndTable() {
           <option value="https://dns.quad9.net/dns-query|Swiss Uncensored">Quad9 Swiss DoH (Switzerland)</option>
           <option value="198.51.100.4|SmartDNS US">SmartDNS US Proxy (United States)</option>
           <option value="https://security.cloudflare-dns.com/dns-query|Cloudflare US">Cloudflare US (Security)</option>
+          <option value="tcp-tls:common.dot.dns.yandex.net:853|Yandex DoT">Yandex DNS DoT (TLS Port 853)</option>
         </optgroup>
       `;
 
@@ -63,18 +64,43 @@ async function populateRoutingPresetsAndTable() {
           `;
 
           return `
-            <tr>
-              <td>
+            <tr class="upstream-catalog-card-row">
+              <!-- MOBILE VIEW -->
+              <td class="mobile-only">
+                <div class="upstream-card-header">
+                  <span style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">${u.name}</span>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="pill" style="background: rgba(255, 255, 255, 0.06); font-size: 0.68rem; text-transform: uppercase;">${protoUpper}</span>
+                    ${typeBadge}
+                  </div>
+                </div>
+                <div class="upstream-details-box" style="margin-top: 8px;">
+                  <code style="font-family: monospace; font-size: 0.78rem; color: var(--accent-cyan); word-break: break-all;">${u.endpoint}</code>
+                  <div class="upstream-controls-line">
+                    <div>${latBadge}</div>
+                    ${statusBadge}
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="window.useResolverForRoute('${u.endpoint.replace(/'/g, "\\'")}', '${u.name.replace(/'/g, "\\'")}')" style="flex: 1; font-size: 0.8rem; padding: 6px;" title="Use this resolver in routing rule above">
+                    + Use in Route
+                  </button>
+                  ${isCustom ? `<button type="button" class="btn btn-danger btn-sm" onclick="window.handleDeleteRoutingUpstream(${u.id}, '${u.name.replace(/'/g, "\\'")}')" style="padding: 6px 12px; font-size: 0.8rem;" title="Delete custom resolver">✕</button>` : ""}
+                </div>
+              </td>
+
+              <!-- DESKTOP VIEW -->
+              <td class="desktop-only">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span style="font-weight: 600; color: var(--text-main);">${u.name}</span>
                 </div>
               </td>
-              <td><code style="font-family: monospace; font-size: 0.8rem; color: var(--accent-cyan); word-break: break-all;">${u.endpoint}</code></td>
-              <td><span class="pill" style="background: rgba(255, 255, 255, 0.06); font-size: 0.72rem; text-transform: uppercase;">${protoUpper}</span></td>
-              <td>${latBadge}</td>
-              <td>${typeBadge}</td>
-              <td>${statusBadge}</td>
-              <td style="text-align: right;">
+              <td class="desktop-only"><code style="font-family: monospace; font-size: 0.8rem; color: var(--accent-cyan); word-break: break-all;">${u.endpoint}</code></td>
+              <td class="desktop-only"><span class="pill" style="background: rgba(255, 255, 255, 0.06); font-size: 0.72rem; text-transform: uppercase;">${protoUpper}</span></td>
+              <td class="desktop-only">${latBadge}</td>
+              <td class="desktop-only">${typeBadge}</td>
+              <td class="desktop-only">${statusBadge}</td>
+              <td class="desktop-only" style="text-align: right;">
                 <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="window.useResolverForRoute('${u.endpoint.replace(/'/g, "\\'")}', '${u.name.replace(/'/g, "\\'")}')" style="font-size: 0.75rem; padding: 3px 8px;" title="Use this resolver in routing rule above">
                     + Use in Route
@@ -112,6 +138,10 @@ async function handleAddRoutingCustomDns(event) {
   const name = document.getElementById("quickDnsName").value.trim();
   const endpoint = document.getElementById("quickDnsEndpoint").value.trim();
   const protocol = document.getElementById("quickDnsProtocol").value;
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Adding...");
+  }
 
   try {
     const res = await apiRequest("/api/upstreams/add", {
@@ -128,6 +158,10 @@ async function handleAddRoutingCustomDns(event) {
   } catch (err) {
     showToast(`Failed to add custom resolver: ${err.message}`, "error");
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -182,17 +216,39 @@ async function loadRouting() {
     tbody.innerHTML = routings.map(r => {
       const targetId = r.id != null ? r.id : r.domain_pattern;
       return `
-        <tr>
-          <td><code style="font-weight: 600; color: var(--text-main);">${r.domain_pattern}</code></td>
-          <td><span style="font-family: monospace; font-size: 0.82rem; color: var(--accent-cyan);">${r.resolver}</span></td>
-          <td><span class="pill" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-violet);">${r.tag}</span></td>
-          <td>
+        <tr class="routing-card-row">
+          <!-- MOBILE VIEW -->
+          <td class="mobile-only">
+            <div class="routing-card-header">
+              <code style="font-weight: 700; color: var(--text-main); font-size: 0.9rem; word-break: break-all;">${r.domain_pattern}</code>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label class="switch">
+                  <input type="checkbox" ${r.enabled ? "checked" : ""} onchange="window.handleToggleRouting(${r.id}, this.checked)">
+                  <span class="slider"></span>
+                </label>
+                <button class="btn btn-danger btn-sm" onclick="window.handleDeleteRouting('${targetId}', '${r.domain_pattern}')" style="padding: 3px 8px; font-size: 0.78rem;">✕</button>
+              </div>
+            </div>
+            <div class="routing-resolver-box" style="margin-top: 8px;">
+              <span style="font-size: 0.72rem; color: var(--text-dim);">Dedicated Upstream Resolver:</span>
+              <span style="font-family: monospace; font-size: 0.8rem; color: var(--accent-cyan); word-break: break-all;">${r.resolver}</span>
+              <div style="margin-top: 4px;">
+                <span class="pill" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-violet); font-size: 0.7rem;">${r.tag}</span>
+              </div>
+            </div>
+          </td>
+
+          <!-- DESKTOP VIEW -->
+          <td class="desktop-only"><code style="font-weight: 600; color: var(--text-main);">${r.domain_pattern}</code></td>
+          <td class="desktop-only"><span style="font-family: monospace; font-size: 0.82rem; color: var(--accent-cyan);">${r.resolver}</span></td>
+          <td class="desktop-only"><span class="pill" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-violet);">${r.tag}</span></td>
+          <td class="desktop-only">
             <label class="switch">
               <input type="checkbox" ${r.enabled ? "checked" : ""} onchange="window.handleToggleRouting(${r.id}, this.checked)">
               <span class="slider"></span>
             </label>
           </td>
-          <td>
+          <td class="desktop-only">
             <button class="btn btn-danger btn-sm" onclick="window.handleDeleteRouting('${targetId}', '${r.domain_pattern}')">✕ Remove</button>
           </td>
         </tr>
@@ -201,6 +257,56 @@ async function loadRouting() {
   } catch (err) {
     console.error("Error loading routing rules:", err);
   }
+}
+
+function detectAndNormalizeResolver(val) {
+  let ep = (val || "").trim();
+  if (!ep) return { endpoint: "", protocol: "udp" };
+
+  if (ep.startsWith("tls://") || ep.startsWith("dot://")) {
+    let host = ep.split("://")[1].replace(/\/.*$/, "");
+    if (!host.includes(":")) host += ":853";
+    return { endpoint: `tcp-tls:${host}`, protocol: "dot" };
+  }
+  if (ep.startsWith("tcp-tls:")) {
+    let host = ep.substring("tcp-tls:".length).replace(/\/.*$/, "");
+    if (!host.includes(":")) host += ":853";
+    return { endpoint: `tcp-tls:${host}`, protocol: "dot" };
+  }
+  if (ep.startsWith("udp://") || ep.startsWith("udp:")) {
+    return { endpoint: ep.replace(/^udp:\/\//, "").replace(/^udp:/, ""), protocol: "udp" };
+  }
+
+  const cleanHost = ep.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+  const hasPort853 = ep.includes(":853");
+  const hasDotInHost = cleanHost.toLowerCase().includes(".dot.") || cleanHost.toLowerCase().startsWith("dot.");
+
+  if (hasPort853 || hasDotInHost) {
+    let port = "853";
+    const netloc = ep.replace(/^https?:\/\//, "").split("/")[0];
+    if (netloc.includes(":")) {
+      const p = netloc.split(":")[1];
+      if (/^\d+$/.test(p)) port = p;
+    }
+    return { endpoint: `tcp-tls:${cleanHost}:${port}`, protocol: "dot" };
+  }
+
+  // Pure IP
+  if (/^(\d{1,3}\.){3}\d{1,3}(:\d+)?$/.test(ep)) {
+    if (ep.includes(":853")) {
+      return { endpoint: `tcp-tls:${ep.split(":")[0]}:853`, protocol: "dot" };
+    }
+    return { endpoint: ep, protocol: "udp" };
+  }
+
+  // HTTPS or hostname
+  if (!ep.startsWith("http://") && !ep.startsWith("https://")) {
+    ep = `https://${ep}`;
+  }
+  if (!ep.replace(/^https?:\/\//, "").includes("/")) {
+    ep = `${ep}/dns-query`;
+  }
+  return { endpoint: ep, protocol: "doh" };
 }
 
 function applyRoutingPreset() {
@@ -214,31 +320,45 @@ function applyRoutingPreset() {
 async function handleAddRouting(event) {
   event.preventDefault();
   const domainPattern = document.getElementById("routingDomain").value.trim();
-  const resolver = document.getElementById("routingResolver").value.trim();
+  let rawResolver = document.getElementById("routingResolver").value.trim();
   const select = document.getElementById("routingPresetSelect");
+  const btn = event.target ? event.target.querySelector("button[type='submit']") : null;
+  if (btn && window.setButtonLoading) {
+    window.setButtonLoading(btn, true, "Routing...");
+  }
   let tag = "Geo-Bypass";
   if (select.value && select.value.includes("|")) {
     tag = select.value.split("|")[1];
   }
+
+  // Auto-detect and normalize endpoint on client side
+  const detected = detectAndNormalizeResolver(rawResolver);
+  const resolverToSubmit = detected.endpoint || rawResolver;
 
   try {
     const res = await apiRequest("/api/routing/add", {
       method: "POST",
       body: JSON.stringify({
         domain_pattern: domainPattern,
-        resolver: resolver,
+        resolver: resolverToSubmit,
         tag: tag
       })
     });
     if (res && res.success) {
-      showToast(`Routed ${domainPattern} -> ${resolver}`);
+      const finalResolver = res.normalized_resolver || resolverToSubmit;
+      showToast(`Routed ${domainPattern} -> ${finalResolver}`);
       document.getElementById("routingDomain").value = "";
       document.getElementById("routingResolver").value = "";
       await loadRouting();
+      if (window.loadRoutingRulesCache) window.loadRoutingRulesCache(true);
     }
   } catch (err) {
     showToast(`Failed to add routing rule: ${err.message}`, "error");
     console.error(err);
+  } finally {
+    if (btn && window.setButtonLoading) {
+      window.setButtonLoading(btn, false);
+    }
   }
 }
 
@@ -249,6 +369,7 @@ async function handleToggleRouting(id, enabled) {
       body: JSON.stringify({ id, enabled })
     });
     showToast(enabled ? "Routing rule enabled" : "Routing rule disabled");
+    if (window.loadRoutingRulesCache) window.loadRoutingRulesCache(true);
   } catch (err) {
     showToast(`Failed to toggle rule: ${err.message}`, "error");
     console.error(err);
@@ -262,6 +383,7 @@ async function handleDeleteRouting(idOrPattern, label) {
     if (res && res.success) {
       showToast(`Routing rule deleted: ${displayLabel}`);
       await loadRouting();
+      if (window.loadRoutingRulesCache) window.loadRoutingRulesCache(true);
     }
   } catch (err) {
     showToast(`Failed to delete routing: ${err.message}`, "error");

@@ -29,6 +29,7 @@ from tls_manager import ensure_tls_certificates
 from retention import start_retention_scheduler
 from benchmark import start_benchmark_scheduler
 from auth import is_setup_completed, decode_access_token
+from routing_cache import reload_routing_cache
 
 # Import routers
 from api_auth import router as auth_router
@@ -54,10 +55,27 @@ ENABLE_HTTPS = os.getenv("ENABLE_HTTPS", "true").lower() == "true"
 async def lifespan(app: FastAPI):
     # Startup
     print("[Server] Initializing BlockyDNS Hub database & schema...")
-    init_db()
-    seed_initial_data()
+    try:
+        init_db()
+        seed_initial_data()
+    except sqlite3.DatabaseError as err:
+        err_msg = str(err).lower()
+        if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
+            print(f"[DB ALERT] Corrupt database encountered ({err}). Auto-recovering clean database...")
+            from database import recover_corrupt_database
+            recover_corrupt_database()
+            init_db()
+            seed_initial_data()
+        else:
+            raise
+    reload_routing_cache()
     start_retention_scheduler()
     start_benchmark_scheduler()
+    try:
+        from blocky_client import restart_blocky_container
+        asyncio.create_task(restart_blocky_container())
+    except Exception:
+        pass
     yield
     # Shutdown
     print("[Server] Shutting down BlockyDNS Hub...")

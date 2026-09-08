@@ -1,6 +1,9 @@
 import time
 import base64
 import ssl
+import socket
+import struct
+import urllib.parse
 import asyncio
 import httpx
 import dns.message
@@ -16,10 +19,41 @@ DEFAULT_CANDIDATES = [
     {"name": "Quad9 DoT", "endpoint": "tcp-tls:9.9.9.9:853", "protocol": "dot", "enabled": 0, "is_custom": 0},
 ]
 
-# SSL Context for DoT benchmark lookups
+# SSL Context for DoT benchmark lookups (RFC 7858 compliant ALPN 'dot')
 DOT_SSL_CTX = ssl.create_default_context()
 DOT_SSL_CTX.check_hostname = False
 DOT_SSL_CTX.verify_mode = ssl.CERT_NONE
+try:
+    DOT_SSL_CTX.set_alpn_protocols(["dot"])
+except Exception:
+    pass
+
+DOH_BOOTSTRAP_MAP = {
+    "dns.quad9.net": "9.9.9.9",
+    "cloudflare-dns.com": "1.1.1.1",
+    "security.cloudflare-dns.com": "1.1.1.2",
+    "family.cloudflare-dns.com": "1.1.1.3",
+    "dns.google": "8.8.8.8",
+    "dns.adguard-dns.com": "94.140.14.14",
+    "doh.cleanbrowsing.org": "185.228.168.9",
+    "dns.sb": "185.222.222.222",
+}
+
+def _sync_doh_query(endpoint: str, domain: str = "wikipedia.org") -> float:
+    clean_endpoint = endpoint.strip()
+    if not clean_endpoint.startswith("http://") and not clean_endpoint.startswith("https://"):
+        clean_endpoint = f"https://{clean_endpoint}"
+    if "/" not in clean_endpoint.replace("https://", "").replace("http://", ""):
+        clean_endpoint = f"{clean_endpoint}/dns-query"
+
+    parsed = urllib.parse.urlparse(clean_endpoint)
+    host = parsed.hostname or ""
+    bootstrap = DOH_BOOTSTRAP_MAP.get(host)
+
+    q = dns.message.make_query(domain, "A")
+    t0 = time.perf_counter()
+    r = dns.query.https(q, clean_endpoint, timeout=4.0, bootstrap_address=bootstrap, verify=False, post=True)
+    return round((time.perf_counter() - t0) * 1000, 1)
 
 async def benchmark_single_udp(endpoint: str, domain: str = "wikipedia.org") -> dict:
     """Measures latency of standard unencrypted DNS over UDP (port 53)."""
@@ -44,12 +78,19 @@ async def benchmark_single_udp(endpoint: str, domain: str = "wikipedia.org") -> 
         return {"latency_ms": None, "status": f"Error: {type(e).__name__}"}
 
 async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", client: httpx.AsyncClient = None) -> dict:
+    # 1. Primary RFC 8484 DNS-over-HTTPS via HTTP/2 POST
+    try:
+        elapsed_ms = await asyncio.to_thread(_sync_doh_query, endpoint, domain)
+        return {"latency_ms": elapsed_ms, "status": "online"}
+    except Exception:
+        pass
+
+    # 2. Secondary fallback via httpx (for custom JSON/GET endpoints)
     start = time.perf_counter()
     q = dns.message.make_query(domain, "A")
     wire = q.to_wire()
     b64_wire = base64.urlsafe_b64encode(wire).decode("ascii").rstrip("=")
 
-    # Normalize endpoint URL
     clean_endpoint = endpoint.strip()
     if not clean_endpoint.startswith("http://") and not clean_endpoint.startswith("https://"):
         clean_endpoint = f"https://{clean_endpoint}"
@@ -59,13 +100,12 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
     close_client = False
     if client is None:
         try:
-            # Quad9 and modern DoH servers strictly require HTTP/2 (RFC 8484 § 5.2)
             client = httpx.AsyncClient(http2=True, timeout=4.0, verify=False)
         except Exception:
             client = httpx.AsyncClient(timeout=4.0, verify=False)
         close_client = True
     try:
-        # 1. Standard RFC 8484 GET with ?dns= (Primary RFC method over HTTP/2)
+        # RFC 8484 GET with ?dns=
         try:
             url = f"{clean_endpoint}?dns={b64_wire}"
             get_headers = {"Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"}
@@ -73,20 +113,10 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
             if resp.status_code == 200:
                 elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
                 return {"latency_ms": elapsed_ms, "status": "online"}
-            elif resp.status_code == 505:
-                # Upstream strictly demands HTTP/2 (e.g. Quad9)
-                try:
-                    async with httpx.AsyncClient(http2=True, timeout=4.0, verify=False) as h2_client:
-                        h2_resp = await h2_client.get(url, headers=get_headers)
-                        if h2_resp.status_code == 200:
-                            elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-                            return {"latency_ms": elapsed_ms, "status": "online"}
-                except Exception:
-                    pass
         except Exception:
             pass
 
-        # 2. RFC 8484 POST with binary wire payload
+        # RFC 8484 POST
         try:
             post_headers = {
                 "Content-Type": "application/dns-message",
@@ -97,19 +127,10 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
             if resp.status_code == 200:
                 elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
                 return {"latency_ms": elapsed_ms, "status": "online"}
-            elif resp.status_code == 505:
-                try:
-                    async with httpx.AsyncClient(http2=True, timeout=4.0, verify=False) as h2_client:
-                        h2_resp = await h2_client.post(clean_endpoint, content=wire, headers=post_headers)
-                        if h2_resp.status_code == 200:
-                            elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-                            return {"latency_ms": elapsed_ms, "status": "online"}
-                except Exception:
-                    pass
         except Exception:
             pass
 
-        # 3. JSON DoH fallback
+        # JSON DoH fallback
         try:
             json_url = clean_endpoint.replace("/dns-query", "/resolve") if "dns.google" in clean_endpoint else clean_endpoint
             resp = await client.get(
@@ -128,25 +149,78 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
             await client.aclose()
 
 
-async def benchmark_single_dot(endpoint: str, domain: str = "wikipedia.org") -> dict:
-    start = time.perf_counter()
-    try:
-        clean = endpoint.replace("tcp-tls:", "").strip()
-        parts = clean.split(":")
-        host = parts[0]
-        port = int(parts[1]) if len(parts) > 1 else 853
+# Well-known DoT endpoint SNI mappings for IP-based endpoints (RFC 6066 compliant)
+DOT_SNI_MAP = {
+    "9.9.9.9": "dns.quad9.net",
+    "149.112.112.112": "dns.quad9.net",
+    "1.1.1.1": "cloudflare-dns.com",
+    "1.0.0.1": "cloudflare-dns.com",
+    "8.8.8.8": "dns.google",
+    "8.8.4.4": "dns.google",
+    "94.140.14.14": "dns.adguard.com",
+    "94.140.15.15": "dns.adguard.com",
+}
 
-        q = dns.message.make_query(domain, "A")
-        await asyncio.to_thread(
-            dns.query.tls,
-            q,
-            host,
-            port=port,
-            timeout=3.0,
-            ssl_context=DOT_SSL_CTX,
-            server_hostname=host
-        )
-        elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+def _sync_dot_query(host: str, port: int, sni: str | None, domain: str = "wikipedia.org") -> float:
+    q = dns.message.make_query(domain, "A")
+    wire = q.to_wire()
+    start = time.perf_counter()
+    last_err = None
+
+    # Allow up to 3 attempts with brief backoff for public DoT listeners
+    for attempt in range(3):
+        raw_s = None
+        ss = None
+        try:
+            raw_s = socket.create_connection((host, port), timeout=4.0)
+            ss = DOT_SSL_CTX.wrap_socket(raw_s, server_hostname=sni)
+            ss.sendall(struct.pack("!H", len(wire)) + wire)
+            len_data = ss.recv(2)
+            if len(len_data) < 2:
+                raise OSError("Truncated DoT length response")
+            resp_len = struct.unpack("!H", len_data)[0]
+            resp_data = b""
+            while len(resp_data) < resp_len:
+                chunk = ss.recv(resp_len - len(resp_data))
+                if not chunk:
+                    break
+                resp_data += chunk
+            if len(resp_data) < resp_len:
+                raise OSError("Incomplete DoT payload")
+            dns.message.from_wire(resp_data)
+            return round((time.perf_counter() - start) * 1000, 1)
+        except Exception as err:
+            last_err = err
+            if attempt < 2:
+                time.sleep(0.08)
+                continue
+            raise
+        finally:
+            if ss:
+                try:
+                    ss.close()
+                except Exception:
+                    pass
+            elif raw_s:
+                try:
+                    raw_s.close()
+                except Exception:
+                    pass
+
+    if last_err:
+        raise last_err
+
+async def benchmark_single_dot(endpoint: str, domain: str = "wikipedia.org") -> dict:
+    clean = endpoint.replace("tcp-tls:", "").replace("tls://", "").replace("dot://", "").replace("tcp://", "").strip()
+    parts = clean.split(":")
+    host = parts[0]
+    port = int(parts[1]) if len(parts) > 1 else 853
+
+    # SNI hostname (RFC 6066 requires non-numeric SNI for TLS handshakes)
+    sni = DOT_SNI_MAP.get(host) if host in DOT_SNI_MAP else (host if not host.replace(".", "").isdigit() else None)
+
+    try:
+        elapsed_ms = await asyncio.to_thread(_sync_dot_query, host, port, sni, domain)
         return {"latency_ms": elapsed_ms, "status": "online"}
     except Exception as e:
         return {"latency_ms": None, "status": f"Error: {type(e).__name__}"}

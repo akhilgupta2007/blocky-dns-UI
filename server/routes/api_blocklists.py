@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, refresh_lists, flush_cache, restart_blocky_container
+from blocky_client import sync_config_from_db, refresh_lists, flush_cache
 
 router = APIRouter(prefix="/api/blocklists", tags=["blocklists"], dependencies=[Depends(get_current_user)])
 
