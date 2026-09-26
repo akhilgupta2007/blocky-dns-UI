@@ -201,12 +201,6 @@ function switchView(viewName, subTab = null) {
   if (activeNav) activeNav.classList.add("active");
   if (activeBottomNav) activeBottomNav.classList.add("active");
 
-  // Support legacy nav item IDs if present
-  if (viewName === "blocklists") {
-    const legacyNav = document.getElementById("navBlocklists");
-    if (legacyNav) legacyNav.classList.add("active");
-  }
-
   // Update Sections
   document.querySelectorAll(".view-section").forEach(el => el.classList.remove("active"));
   const activeSection = document.getElementById("view" + navSuffix);
@@ -346,7 +340,13 @@ async function triggerListRefresh() {
     const res = await apiRequest("/api/blocklists/refresh", { method: "POST" });
     if (res && res.success) {
       showToast("All blocklists reloaded successfully!");
+      if (typeof loadBlocklistsAndRules === "function") {
+        await loadBlocklistsAndRules();
+      }
       loadDashboard();
+      setTimeout(() => {
+        if (typeof loadBlocklistsAndRules === "function") loadBlocklistsAndRules();
+      }, 3500);
     }
   } catch (err) {
     console.error(err);

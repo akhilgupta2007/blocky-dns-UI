@@ -10,56 +10,43 @@ from database import get_connection
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-def get_blocky_api_url() -> str:
-    # In Docker container environments, always respect the container's environment URL
-    env_url = os.getenv("BLOCKY_API_URL")
-    if env_url:
-        return env_url.rstrip("/")
+def get_setting(key: str, default: str = None) -> str:
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'blocky_api_url';")
-        row = cursor.fetchone()
-        conn.close()
-        if row and row["value"]:
-            return row["value"].rstrip("/")
-    except Exception:
-        pass
-    return "http://localhost:4000"
-
-def get_blocky_config_path() -> Path:
-    # In Docker container environments, always respect the container's environment path
-    env_path = os.getenv("BLOCKY_CONFIG_PATH")
-    if env_path:
-        return Path(env_path)
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'blocky_config_path';")
-        row = cursor.fetchone()
-        conn.close()
-        if row and row["value"]:
-            val = row["value"].strip()
-            # Guard against Windows drive paths inside Linux containers
-            if os.name != 'nt' and (':' in val or '\\' in val):
-                return BASE_DIR / "config" / "config.yml"
-            return Path(val)
-    except Exception:
-        pass
-    return BASE_DIR / "config" / "config.yml"
-
-def get_integration_mode() -> str:
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'integration_mode';")
+        cursor.execute("SELECT value FROM settings WHERE key = ?;", (key,))
         row = cursor.fetchone()
         conn.close()
         if row and row["value"]:
             return row["value"]
     except Exception:
         pass
-    return os.getenv("INTEGRATION_MODE", "all-in-one")
+    return default
+
+def get_blocky_api_url() -> str:
+    # In Docker container environments, always respect the container's environment URL
+    env_url = os.getenv("BLOCKY_API_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    val = get_setting("blocky_api_url")
+    return val.rstrip("/") if val else "http://localhost:4000"
+
+def get_blocky_config_path() -> Path:
+    # In Docker container environments, always respect the container's environment path
+    env_path = os.getenv("BLOCKY_CONFIG_PATH")
+    if env_path:
+        return Path(env_path)
+    val = get_setting("blocky_config_path")
+    if val:
+        val = val.strip()
+        # Guard against Windows drive paths inside Linux containers
+        if os.name != 'nt' and (':' in val or '\\' in val):
+            return BASE_DIR / "config" / "config.yml"
+        return Path(val)
+    return BASE_DIR / "config" / "config.yml"
+
+def get_integration_mode() -> str:
+    return get_setting("integration_mode", os.getenv("INTEGRATION_MODE", "all-in-one"))
 
 async def test_blocky_connection(api_url: str) -> dict:
     """Tests connection to a target Blocky API endpoint and returns latency/blocking status."""

@@ -26,6 +26,28 @@ class TestBlockyDnsHub(unittest.TestCase):
         init_db()
         seed_initial_data()
         ensure_tls_certificates()
+
+        # Ensure active log entries exist within the 24h window for stats & filter assertions
+        from database import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE response_type IN ('BLOCKED', 'REBIND');")
+        if cur.fetchone()["cnt"] == 0:
+            cur.execute("""
+            INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question, answer)
+            VALUES (datetime('now', '-5 minutes'), '192.168.1.45', '192.168.1.45', 2, 'Blocked by list: StevenBlack', 'BLOCKED', 'google-analytics.com', '0.0.0.0');
+            """)
+            conn.commit()
+
+        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE response_type = 'RESOLVED';")
+        if cur.fetchone()["cnt"] == 0:
+            cur.execute("""
+            INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question, answer)
+            VALUES (datetime('now', '-10 minutes'), '192.168.1.12', '192.168.1.12', 12, 'Upstream Cloudflare DoH', 'RESOLVED', 'github.com', '140.82.121.4');
+            """)
+            conn.commit()
+        conn.close()
+
         cls.client = TestClient(app)
         from auth import create_access_token
         token = create_access_token("admin")

@@ -14,11 +14,33 @@ async function loadBlocklistsAndRules() {
   }
 }
 
+function formatBlocklistDate(dateStr) {
+  if (!dateStr) return "Pending";
+  try {
+    const raw = dateStr.endsWith("Z") ? dateStr : dateStr.replace(" ", "T") + "Z";
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 function renderBlocklists(lists) {
   const container = document.getElementById("curatedCatalogList");
   if (!container) return;
 
   container.innerHTML = lists.map(l => {
+    const ruleCount = l.rule_count || 0;
+    const ruleText = ruleCount > 0 
+      ? `<strong>${ruleCount.toLocaleString()}</strong> rules` 
+      : `<span style="color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 4px;">⚡ Counting rules...</span>`;
+
     return `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
         <div style="flex: 1; padding-right: 12px;">
@@ -26,9 +48,10 @@ function renderBlocklists(lists) {
             <span style="font-weight: 600; font-size: 0.92rem;">${l.name}</span>
             <span style="font-size: 0.72rem; color: var(--text-dim);">${l.category}</span>
           </div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-            <span>${(l.rule_count || 0).toLocaleString()} rules</span> &bull; 
-            <span style="font-family: monospace; opacity: 0.7;">${l.url.substring(0, 45)}...</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>${ruleText}</span> &bull; 
+            <span>🕒 Updated: ${formatBlocklistDate(l.last_updated)}</span> &bull; 
+            <span style="font-family: monospace; opacity: 0.75; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.url}">${l.url}</span>
           </div>
         </div>
 
@@ -76,6 +99,9 @@ async function handleAddBlocklist(event) {
       document.getElementById("newListName").value = "";
       document.getElementById("newListUrl").value = "";
       await loadBlocklistsAndRules();
+      // Poll background rule counter
+      setTimeout(() => loadBlocklistsAndRules(), 2500);
+      setTimeout(() => loadBlocklistsAndRules(), 6000);
     }
   } catch (err) {
     showToast(`Failed to add blocklist: ${err.message}`, "error");

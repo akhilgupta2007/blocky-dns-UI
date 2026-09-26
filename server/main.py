@@ -1,5 +1,7 @@
 import os
 import sys
+import asyncio
+import sqlite3
 import threading
 import http.server
 import socketserver
@@ -121,8 +123,6 @@ app.include_router(services_router)
 # Mount static frontend assets
 app.mount("/css", StaticFiles(directory=str(PUBLIC_DIR / "css")), name="css")
 app.mount("/js", StaticFiles(directory=str(PUBLIC_DIR / "js")), name="js")
-if (PUBLIC_DIR / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=str(PUBLIC_DIR / "assets")), name="assets")
 
 @app.get("/login")
 def login_page(request: Request):

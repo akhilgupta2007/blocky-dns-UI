@@ -98,6 +98,7 @@ Most homelab setups rely on either **Pi-hole** or **AdGuard Home**. BlockyDNS wa
 * **AdGuard / ABP Bulk Importer**:
   * Directly import rules in standard AdGuard format (e.g. `@@||domain.com^$important` for Whitelist and `||domain.com^` for Blacklist).
   * Automatically categorizes, strips syntax markers, and compiles them directly into native Blocky engine text files.
+* **Streaming Asynchronous Rule Counter**: Accurately counts rules from remote hosts files and raw domain lists in the background using non-blocking HTTP streaming, with real-time UI status (`⚡ Counting rules...`), automatic background backfilling, and human-readable timestamps.
 * **Structured Custom Rules List**: View rules in a clean, searchable table with domain badges, scopes (Exact / Wildcard / Regex), and instant search filtering.
 
 ### 🔍 3. Live Query Log & Threat Intelligence
@@ -253,10 +254,25 @@ docker compose up -d
 
 #### 4. Access the Dashboard:
 * **Secured Web Dashboard (HTTPS)**: `https://<YOUR-SERVER-IP>:3443`
-* **HTTP (Redirects to HTTPS)**: `http://<YOUR-SERVER-IP>:3000`
+* **HTTP (Auto-Redirects to HTTPS)**: `http://<YOUR-SERVER-IP>:3000`
 * **DNS Server Port**: `53 (UDP & TCP)`
 
-> **First Run**: Open `https://<YOUR-SERVER-IP>:3443` in your browser. The initial setup wizard will guide you through creating your master administrator password.
+#### 🔐 Default Login Credentials
+Upon initial launch, the system automatically seeds a default administrator account:
+
+| Field | Default Value | Description |
+| :--- | :--- | :--- |
+| **Username** | `admin` | Default Master Administrator |
+| **Password** | `StrongPassword123!` | Initial pre-seeded password |
+
+> 🔒 **Security Notice**: Immediately change this password after your first login via **Settings ➔ Security & Auth**, or run the CLI password reset tool directly:
+> ```bash
+> # Inside Docker container:
+> docker exec -it blockydns-hub python /app/server/reset_password.py admin "YourNewStrongPassword"
+>
+> # Local environment:
+> python server/reset_password.py admin "YourNewStrongPassword"
+> ```
 
 ---
 
@@ -327,6 +343,20 @@ docker compose up -d
 ---
 
 ## 📋 Changelog & Version History
+
+### [v1.1.1] - 2026-09-26
+
+#### ⚡ Asynchronous Streaming Rule Counter & Background Ingestion
+* **Memory-Efficient Line Streaming**: Implemented `count_rules_from_url()` using `httpx.AsyncClient` streaming to count rules from large remote blocklist URLs line-by-line without high memory consumption.
+* **Format & Loopback Normalization**: Correctly parses both hosts-format (`0.0.0.0 domain.com`, `127.0.0.1 domain.com`) and plain domain lists while skipping comments (`#`, `!`, `//`) and loopback hostnames (`localhost`, `local`).
+* **Live UI Status Badges**: Added real-time `⚡ Counting rules...` indicators, human-friendly update timestamps (`formatBlocklistDate`), and automated background backfilling for any list with pending counts.
+
+#### 🛠️ Core Simplicity & Connection Lifecycle Hardening
+* **Unified Settings Access**: Consolidated repetitive SQLite configuration queries into a single, clean `get_setting()` helper across the core service engine.
+* **Leak-Proof Database Lifecycle**: Hardened SQLite connection handling across asynchronous background tasks to guarantee zero connection leaks or `ResourceWarning` notices.
+* **Automated Seed Log Fixtures**: Embedded automated 24-hour test log seeding in `test_backend.py` to ensure analytics, stats, and filter test assertions pass deterministically.
+
+---
 
 ### [v1.1.0] - 2026-09-08
 

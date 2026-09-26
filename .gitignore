@@ -40,5 +40,7 @@ update.tar.gz
 
 # Local testing and artifacts
 test_output/
-test_ui_loaders.py
+data_test/
+config/config_test.yml
+
 
