@@ -11,8 +11,10 @@ services:
       - "4000:4000"
     environment:
       - TZ=UTC
+    configs:
+      - source: blocky_config
+        target: /app/config.yml
     volumes:
-      - ./config/config.yml:/app/config.yml:ro
       - ./data:/app/data
     networks:
       - blocky-net
@@ -24,9 +26,7 @@ services:
 
   # 2. BlockyDNS Hub Dashboard & Secured HTTPS API
   hub:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/akhilgupta2007/blocky-dns-ui:latest
     container_name: blockydns-hub
     restart: unless-stopped
     ports:
@@ -35,26 +35,64 @@ services:
     environment:
       - INTEGRATION_MODE=all-in-one
       - BLOCKY_API_URL=http://blocky:4000
-      - BLOCKY_CONFIG_PATH=/app/config/config.yml
+      - BLOCKY_CONFIG_PATH=/app/data/config.yml
       - DB_TYPE=sqlite
       - DATA_DIR=/app/data
       - CERTS_DIR=/app/certs
       - HTTP_PORT=3000
       - HTTPS_PORT=3443
       - ENABLE_HTTPS=true
-      - JWT_SECRET=super_secret_blockydns_jwt_key_change_me
+      - JWT_SECRET=change_me_to_a_random_secure_secret_string
     volumes:
-      - ./server:/app/server
-      - ./config:/app/config
       - ./data:/app/data
       - ./certs:/app/certs
-      - ./public:/app/public:ro
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       blocky:
         condition: service_started
     networks:
       - blocky-net
+
+configs:
+  blocky_config:
+    content: |
+      upstreams:
+        groups:
+          default:
+            - https://1.1.1.1/dns-query
+            - tcp-tls:1.1.1.1:853
+            - https://dns.quad9.net/dns-query
+            - tcp-tls:9.9.9.9:853
+        strategy: parallel_best
+        timeout: 2s
+      bootstrapDns:
+        - 1.1.1.1
+        - 8.8.8.8
+      customDNS:
+        customTTL: 1h
+        mapping:
+          router.lan: 192.168.1.1
+      blocking:
+        denylists:
+          ads:
+            - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+        clientGroupsBlock:
+          default:
+            - ads
+        blockType: zeroIp
+        loading:
+          refreshPeriod: 4h
+          strategy: fast
+      queryLog:
+        type: sqlite
+        target: /app/data/blockydns.db
+        logRetentionDays: 7
+      ports:
+        dns: 53
+        http: 4000
+      prometheus:
+        enable: true
+        path: /metrics
 
 networks:
   blocky-net:

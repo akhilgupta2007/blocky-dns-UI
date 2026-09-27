@@ -161,21 +161,27 @@ curl -fsSL https://raw.githubusercontent.com/akhilgupta2007/blocky-dns-UI/main/c
 docker compose up -d
 ```
 
-#### Or paste directly into Portainer / Dockge / `docker-compose.yml`:
+#### 📋 1-Click Portainer / Dockge Web Editor Deployment (Zero Host Files Needed)
+Simply copy and paste this self-contained stack directly into your Portainer or Dockge Web Editor and click **Deploy the stack**:
+
 ```yaml
 services:
-  # 1. Blocky DNS Engine (Fast Go binary DNS proxy & ad-blocker)
+  # 1. Blocky DNS Engine (Fast Go binary proxy & ad-blocker)
   blocky:
     image: ghcr.io/0xerr0r/blocky:latest
     container_name: blocky-engine
+    user: "0:0"
     restart: unless-stopped
     ports:
       - "53:53/udp"
       - "53:53/tcp"
+      - "4000:4000"
     environment:
       - TZ=UTC
+    configs:
+      - source: blocky_config
+        target: /app/config.yml
     volumes:
-      - ./config/config.yml:/app/config.yml:ro
       - ./data:/app/data
     networks:
       - blocky-net
@@ -185,18 +191,18 @@ services:
       timeout: 5s
       retries: 3
 
-  # 2. BlockyDNS Hub Dashboard (Pre-built Multi-Arch Image)
+  # 2. BlockyDNS Hub Dashboard & Secured HTTPS API
   hub:
     image: ghcr.io/akhilgupta2007/blocky-dns-ui:latest
     container_name: blockydns-hub
     restart: unless-stopped
     ports:
-      - "3000:3000"   # HTTP (Auto-redirects to HTTPS)
+      - "3000:3000"   # HTTP (Automatically redirects to HTTPS)
       - "3443:3443"   # End-to-End Encrypted HTTPS (TLS 1.3)
     environment:
       - INTEGRATION_MODE=all-in-one
       - BLOCKY_API_URL=http://blocky:4000
-      - BLOCKY_CONFIG_PATH=/app/config/config.yml
+      - BLOCKY_CONFIG_PATH=/app/data/config.yml
       - DB_TYPE=sqlite
       - DATA_DIR=/app/data
       - CERTS_DIR=/app/certs
@@ -205,7 +211,6 @@ services:
       - ENABLE_HTTPS=true
       - JWT_SECRET=change_me_to_a_random_secure_secret_string
     volumes:
-      - ./config:/app/config
       - ./data:/app/data
       - ./certs:/app/certs
       - /var/run/docker.sock:/var/run/docker.sock
@@ -215,9 +220,50 @@ services:
     networks:
       - blocky-net
 
+configs:
+  blocky_config:
+    content: |
+      upstreams:
+        groups:
+          default:
+            - https://1.1.1.1/dns-query
+            - tcp-tls:1.1.1.1:853
+            - https://dns.quad9.net/dns-query
+            - tcp-tls:9.9.9.9:853
+        strategy: parallel_best
+        timeout: 2s
+      bootstrapDns:
+        - 1.1.1.1
+        - 8.8.8.8
+      customDNS:
+        customTTL: 1h
+        mapping:
+          router.lan: 192.168.1.1
+      blocking:
+        denylists:
+          ads:
+            - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+        clientGroupsBlock:
+          default:
+            - ads
+        blockType: zeroIp
+        loading:
+          refreshPeriod: 4h
+          strategy: fast
+      queryLog:
+        type: sqlite
+        target: /app/data/blockydns.db
+        logRetentionDays: 7
+      ports:
+        dns: 53
+        http: 4000
+      prometheus:
+        enable: true
+        path: /metrics
+
 networks:
   blocky-net:
-    name: blocky-net
+    driver: bridge
 ```
 
 ---

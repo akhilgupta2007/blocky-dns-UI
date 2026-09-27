@@ -60,6 +60,8 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         seed_initial_data()
+        from blocky_client import sync_config_from_db
+        sync_config_from_db()
     except sqlite3.DatabaseError as err:
         err_msg = str(err).lower()
         if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
@@ -68,6 +70,8 @@ async def lifespan(app: FastAPI):
             recover_corrupt_database()
             init_db()
             seed_initial_data()
+            from blocky_client import sync_config_from_db
+            sync_config_from_db()
         else:
             raise
     reload_routing_cache()
