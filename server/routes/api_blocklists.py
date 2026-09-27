@@ -4,7 +4,7 @@ import httpx
 import asyncio
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, refresh_lists, flush_cache
+from blocky_client import sync_config_from_db, refresh_lists, flush_cache, schedule_blocky_restart
 
 router = APIRouter(prefix="/api/blocklists", tags=["blocklists"], dependencies=[Depends(get_current_user)])
 
@@ -108,6 +108,7 @@ async def toggle_blocklist(req: ToggleRequest):
     conn.close()
 
     sync_config_from_db()
+    schedule_blocky_restart()
     await refresh_lists()
     await flush_cache()
     return {"success": True}
@@ -136,6 +137,7 @@ async def add_blocklist(req: AddBlocklistRequest, background_tasks: BackgroundTa
     conn.close()
 
     sync_config_from_db()
+    schedule_blocky_restart()
     await refresh_lists()
     await flush_cache()
 
@@ -157,6 +159,7 @@ async def delete_blocklist(target: str):
     conn.close()
 
     sync_config_from_db()
+    schedule_blocky_restart()
     await refresh_lists()
     await flush_cache()
     return {"success": True}

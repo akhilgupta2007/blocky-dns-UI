@@ -178,11 +178,13 @@ services:
       - "4000:4000"
     environment:
       - TZ=UTC
+      - BLOCKY_CONFIG_FILE=/app/config
     configs:
       - source: blocky_config
-        target: /app/config.yml
+        target: /app/config/00_default.yml
     volumes:
       - ./data:/app/data
+      - ./data:/app/config/dynamic
     networks:
       - blocky-net
     healthcheck:
@@ -243,6 +245,10 @@ configs:
         denylists:
           ads:
             - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+            - https://big.oisd.nl
+            - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.txt
+            - https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV.txt
+            - https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts
         clientGroupsBlock:
           default:
             - ads
