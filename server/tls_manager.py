@@ -97,9 +97,9 @@ def ensure_tls_certificates():
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
     try:
-        os.chmod(str(KEY_PATH), 0o666)
-        os.chmod(str(CERT_PATH), 0o666)
-        os.chmod(str(CERTS_DIR), 0o777)
+        os.chmod(str(KEY_PATH), 0o600)
+        os.chmod(str(CERT_PATH), 0o644)
+        os.chmod(str(CERTS_DIR), 0o750)
     except Exception:
         pass
 

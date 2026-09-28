@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import httpx
-import asyncio
 from database import get_connection
 from auth import get_current_user
 from blocky_client import sync_config_from_db, refresh_lists, flush_cache, schedule_blocky_restart

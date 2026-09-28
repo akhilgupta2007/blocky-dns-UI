@@ -1,3 +1,15 @@
+// Global HTML Escaping to prevent DOM XSS
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+window.escapeHtml = escapeHtml;
+
 // App State & Routing
 let currentView = "dashboard";
 let pendingRequests = 0;
@@ -213,6 +225,11 @@ function switchView(viewName, subTab = null) {
     switchRoutingSubTab(targetSubTab, false);
   } else if (canonicalView === "settings" && targetSubTab) {
     switchSettingsSubTab(targetSubTab, false);
+  }
+
+  // Teardown background streaming when leaving queryLog to avoid memory/network leaks
+  if (canonicalView !== "queryLog" && window.closeLiveStream) {
+    window.closeLiveStream();
   }
 
   // Trigger view-specific loads

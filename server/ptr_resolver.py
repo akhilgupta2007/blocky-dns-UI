@@ -1,9 +1,37 @@
 import socket
 import threading
+import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from database import get_connection
 
-# Cache to avoid hammering router PTR queries
-RESOLVED_CACHE = {}
+# Bounded LRU cache to avoid memory leaks and router query hammering
+_CACHE_MAX_SIZE = 2000
+_CACHE_TTL_SECONDS = 86400  # 24 hours
+_cache_lock = threading.Lock()
+_RESOLVED_CACHE = OrderedDict()
+
+# Dedicated bounded thread pool for async PTR lookups
+_ptr_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="ptr_resolver")
+
+def _get_cached_ptr(ip: str):
+    with _cache_lock:
+        if ip in _RESOLVED_CACHE:
+            hostname, ts = _RESOLVED_CACHE[ip]
+            if time.time() - ts < _CACHE_TTL_SECONDS:
+                _RESOLVED_CACHE.move_to_end(ip)
+                return hostname
+            else:
+                del _RESOLVED_CACHE[ip]
+    return None
+
+def _set_cached_ptr(ip: str, hostname: str):
+    with _cache_lock:
+        if ip in _RESOLVED_CACHE:
+            _RESOLVED_CACHE.move_to_end(ip)
+        _RESOLVED_CACHE[ip] = (hostname, time.time())
+        if len(_RESOLVED_CACHE) > _CACHE_MAX_SIZE:
+            _RESOLVED_CACHE.popitem(last=False)
 
 def determine_device_icon(name_or_ip: str) -> str:
     lower = name_or_ip.lower()
@@ -25,20 +53,21 @@ def determine_device_icon(name_or_ip: str) -> str:
 
 def resolve_ptr_async(ip: str, force: bool = False):
     if force:
-        RESOLVED_CACHE.pop(ip, None)
-    elif ip in RESOLVED_CACHE:
+        with _cache_lock:
+            _RESOLVED_CACHE.pop(ip, None)
+    elif _get_cached_ptr(ip) is not None:
         return
 
     def worker():
         hostname = None
         # 1. Try querying router's DNS server directly for DHCP hostname if router_ip is configured
+        conn_set = None
         try:
             conn_set = get_connection()
             c_set = conn_set.cursor()
             c_set.execute("SELECT value FROM settings WHERE key = 'router_ip';")
             r_row = c_set.fetchone()
             router_ip = r_row["value"].strip() if r_row and r_row["value"].strip() else None
-            conn_set.close()
 
             if router_ip:
                 import dns.resolver
@@ -56,6 +85,12 @@ def resolve_ptr_async(ip: str, force: bool = False):
                         break
         except Exception:
             hostname = None
+        finally:
+            if conn_set:
+                try:
+                    conn_set.close()
+                except Exception:
+                    pass
 
         # 2. Fallback to OS socket reverse lookup if router lookup was unsuccessful
         if not hostname:
@@ -67,45 +102,38 @@ def resolve_ptr_async(ip: str, force: bool = False):
                 hostname = None
 
         if hostname:
-            RESOLVED_CACHE[ip] = hostname
+            _set_cached_ptr(ip, hostname)
 
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT friendly_name, icon FROM devices WHERE client_ip = ?;", (ip,))
-        existing = cursor.fetchone()
+        conn = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT friendly_name, icon FROM devices WHERE client_ip = ?;", (ip,))
+            existing = cursor.fetchone()
 
-        icon = determine_device_icon(hostname or ip)
-        if existing:
-            # Only update hostname if not manually customized
-            if not existing["friendly_name"] and hostname:
-                cursor.execute("UPDATE devices SET hostname = ?, icon = ? WHERE client_ip = ?;", (hostname, icon, ip))
-        else:
-            cursor.execute("""
-            INSERT OR IGNORE INTO devices (client_ip, hostname, friendly_name, icon, total_queries, blocked_queries)
-            VALUES (?, ?, ?, ?, 1, 0);
-            """, (ip, hostname or ip, hostname, icon))
+            icon = determine_device_icon(hostname or ip)
+            if existing:
+                # Only update hostname if not manually customized
+                if not existing["friendly_name"] and hostname:
+                    cursor.execute("UPDATE devices SET hostname = ?, icon = ? WHERE client_ip = ?;", (hostname, icon, ip))
+            else:
+                cursor.execute("""
+                INSERT OR IGNORE INTO devices (client_ip, hostname, friendly_name, icon, total_queries, blocked_queries)
+                VALUES (?, ?, ?, ?, 1, 0);
+                """, (ip, hostname or ip, hostname, icon))
 
-        conn.commit()
-        conn.close()
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
+    try:
+        _ptr_executor.submit(worker)
+    except Exception:
+        pass
 
-def get_friendly_name_for_ip(ip: str, conn=None) -> str:
-    close_after = False
-    if conn is None:
-        conn = get_connection()
-        close_after = True
-
-    cursor = conn.cursor()
-    cursor.execute("SELECT friendly_name, hostname FROM devices WHERE client_ip = ?;", (ip,))
-    row = cursor.fetchone()
-    if close_after:
-        conn.close()
-
-    if row:
-        if row["friendly_name"] and row["friendly_name"].strip():
-            return row["friendly_name"]
-        if row["hostname"] and row["hostname"].strip():
-            return row["hostname"]
-    return ip

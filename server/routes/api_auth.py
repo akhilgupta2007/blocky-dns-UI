@@ -9,6 +9,9 @@ from blocky_client import sync_config_from_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+def _is_request_secure(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
 class SetupRequest(BaseModel):
     username: str
     password: str
@@ -30,11 +33,13 @@ def auth_status(request: Request):
             username = decode_access_token(token)
             if username:
                 conn = get_connection()
-                c = conn.cursor()
-                c.execute("SELECT id FROM users WHERE username = ?;", (username,))
-                if c.fetchone():
-                    user = username
-                conn.close()
+                try:
+                    c = conn.cursor()
+                    c.execute("SELECT id FROM users WHERE username = ?;", (username,))
+                    if c.fetchone():
+                        user = username
+                finally:
+                    conn.close()
     except Exception:
         pass
 
@@ -53,20 +58,22 @@ def initial_setup(req: SetupRequest, request: Request, response: Response):
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
     conn = get_connection()
-    cursor = conn.cursor()
-    pw_hash = hash_password(req.password)
+    try:
+        cursor = conn.cursor()
+        pw_hash = hash_password(req.password)
 
-    cursor.execute("""
-    INSERT INTO users (username, password_hash, created_at, last_login)
-    VALUES (?, ?, datetime('now'), datetime('now'));
-    """, (req.username.strip(), pw_hash))
+        cursor.execute("""
+        INSERT INTO users (username, password_hash, created_at, last_login)
+        VALUES (?, ?, datetime('now'), datetime('now'));
+        """, (req.username.strip(), pw_hash))
 
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('integration_mode', ?);", (req.integration_mode,))
-    if req.integration_mode == "existing" and req.blocky_api_url:
-        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_api_url', ?);", (req.blocky_api_url.strip(),))
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('integration_mode', ?);", (req.integration_mode,))
+        if req.integration_mode == "existing" and req.blocky_api_url:
+            cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_api_url', ?);", (req.blocky_api_url.strip(),))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
     # Generate initial Blocky config
     try:
@@ -75,10 +82,12 @@ def initial_setup(req: SetupRequest, request: Request, response: Response):
         print(f"[Setup] Warning syncing initial config: {e}")
 
     token = create_access_token(req.username.strip(), request)
+    is_secure = _is_request_secure(request)
     response.set_cookie(
         key="blockydns_token",
         value=token,
         httponly=True,
+        secure=is_secure,
         samesite="lax",
         path="/",
         max_age=72 * 3600
@@ -88,32 +97,37 @@ def initial_setup(req: SetupRequest, request: Request, response: Response):
 @router.post("/login")
 def login(req: LoginRequest, request: Request, response: Response):
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username, password_hash FROM users WHERE username = ?;", (req.username.strip(),))
-    user = cursor.fetchone()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, password_hash FROM users WHERE username = ?;", (req.username.strip(),))
+        user = cursor.fetchone()
 
-    if not user or not verify_password(req.password, user["password_hash"]):
+        if not user or not verify_password(req.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+
+        cursor.execute("UPDATE users SET last_login = datetime('now') WHERE id = ?;", (user["id"],))
+        conn.commit()
+        username = user["username"]
+    finally:
         conn.close()
-        raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    cursor.execute("UPDATE users SET last_login = datetime('now') WHERE id = ?;", (user["id"],))
-    conn.commit()
-    conn.close()
-
-    token = create_access_token(user["username"], request)
+    token = create_access_token(username, request)
+    is_secure = _is_request_secure(request)
     response.set_cookie(
         key="blockydns_token",
         value=token,
         httponly=True,
+        secure=is_secure,
         samesite="lax",
         path="/",
         max_age=72 * 3600
     )
-    return {"success": True, "token": token, "user": user["username"]}
+    return {"success": True, "token": token, "user": username}
 
 @router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(key="blockydns_token", path="/", httponly=True, samesite="lax")
+def logout(request: Request, response: Response):
+    is_secure = _is_request_secure(request)
+    response.delete_cookie(key="blockydns_token", path="/", httponly=True, secure=is_secure, samesite="lax")
     return {"success": True}
 
 class ChangePasswordRequest(BaseModel):
@@ -126,18 +140,19 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
         raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
 
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT password_hash FROM users WHERE username = ?;", (current_user["username"],))
-    user = cursor.fetchone()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM users WHERE username = ?;", (current_user["username"],))
+        user = cursor.fetchone()
 
-    if not user or not verify_password(req.current_password, user["password_hash"]):
+        if not user or not verify_password(req.current_password, user["password_hash"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+        new_hash = hash_password(req.new_password)
+        cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?;", (new_hash, current_user["username"]))
+        conn.commit()
+    finally:
         conn.close()
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
-
-    new_hash = hash_password(req.new_password)
-    cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?;", (new_hash, current_user["username"]))
-    conn.commit()
-    conn.close()
 
     return {"success": True, "message": "Password updated successfully"}
 

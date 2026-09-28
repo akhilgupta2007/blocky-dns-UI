@@ -714,8 +714,6 @@ window.handleRestartEngine = handleRestartEngine;
 window.handleAddUpstream = handleAddUpstream;
 window.handleSaveSettings = handleSaveSettings;
 window.handleSaveIntegration = handleSaveIntegration;
-window.handleToggleCaching = handleToggleCaching;
-window.handleSaveCachingConfig = handleSaveCachingConfig;
 window.handleToggleDnssec = handleToggleDnssec;
 window.handleToggleEcs = handleToggleEcs;
 

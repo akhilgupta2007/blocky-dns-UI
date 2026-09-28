@@ -1,12 +1,12 @@
 import socket
 import time
+import asyncio
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
 from benchmark import run_upstream_benchmark
 from tls_manager import get_certificate_info
-from blocky_client import query_diagnostic_api
 from routing_cache import get_cached_routing_rules
 
 router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(get_current_user)])
@@ -161,14 +161,14 @@ async def run_diagnostic(req: DiagnosticRequest):
         rule_match = f"Blocked by: {blocked_by_list}"
     elif routing_match:
         try:
-            resolved_ip = socket.gethostbyname(domain)
+            resolved_ip = await asyncio.to_thread(socket.gethostbyname, domain)
         except Exception:
             resolved_ip = "1.1.1.1"
         tag = routing_match["tag"] or "Geo-Bypass"
         rule_match = f"Domain Routing: {tag} ({routing_match['resolver']})"
     else:
         try:
-            resolved_ip = socket.gethostbyname(domain)
+            resolved_ip = await asyncio.to_thread(socket.gethostbyname, domain)
             rule_match = "Resolved via Upstream (Clean)"
         except Exception:
             resolved_ip = "NXDOMAIN"
@@ -241,7 +241,7 @@ async def inspect_dnssec(req: DnssecInspectRequest):
 
     # 1. Query DNSKEY
     try:
-        ans_key = res.resolve(domain, "DNSKEY")
+        ans_key = await asyncio.to_thread(res.resolve, domain, "DNSKEY")
         if ans_key:
             has_dnskey = True
             for rdata in ans_key:
@@ -253,7 +253,7 @@ async def inspect_dnssec(req: DnssecInspectRequest):
 
     # 2. Query DS
     try:
-        ans_ds = res.resolve(domain, "DS")
+        ans_ds = await asyncio.to_thread(res.resolve, domain, "DS")
         if ans_ds:
             has_ds = True
             details.append(f"DS: Found {len(ans_ds)} Delegation Signer record(s) at parent TLD")
@@ -262,7 +262,7 @@ async def inspect_dnssec(req: DnssecInspectRequest):
 
     # 3. Query A record with DNSSEC DO flag to check RRSIG
     try:
-        ans_a = res.resolve(domain, "A")
+        ans_a = await asyncio.to_thread(res.resolve, domain, "A")
         response = ans_a.response
         for rrset in response.answer:
             if rrset.rdtype == dns.rdatatype.RRSIG:
@@ -324,7 +324,7 @@ async def get_whois_info(domain: str):
     # 1. Resolve active IP addresses
     resolved_ips = []
     try:
-        addr_info = socket.getaddrinfo(clean_domain, None)
+        addr_info = await asyncio.to_thread(socket.getaddrinfo, clean_domain, None)
         for item in addr_info:
             ip = item[4][0]
             if ip not in resolved_ips:

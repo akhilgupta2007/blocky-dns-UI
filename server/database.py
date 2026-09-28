@@ -39,16 +39,17 @@ def recover_corrupt_database(conn=None):
 
 def ensure_db_permissions():
     try:
-        os.chmod(str(DATA_DIR), 0o777)
+        os.chmod(str(DATA_DIR), 0o775)
     except Exception:
         pass
     for ext in ["", "-wal", "-shm"]:
         p = Path(str(DB_PATH) + ext)
         if p.exists():
             try:
-                os.chmod(str(p), 0o666)
+                os.chmod(str(p), 0o664)
             except Exception:
                 pass
+
 
 def get_connection():
     conn = None
@@ -239,6 +240,8 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_type ON log_entries(response_type);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_qname ON log_entries(question_name);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_question ON log_entries(question);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_type ON log_entries(request_ts, response_type);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_ip ON log_entries(request_ts, client_ip);")
 
     # 9. Key-Value Settings table
     cursor.execute("""
@@ -264,19 +267,41 @@ def init_db():
     conn.commit()
     conn.close()
 
-
     # Ensure files and directories are writable across containers (e.g. Blocky unprivileged UID 100)
     try:
-        os.chmod(str(DB_PATH), 0o666)
+        os.chmod(str(DB_PATH), 0o664)
         for ext in ["-wal", "-shm"]:
             p = Path(str(DB_PATH) + ext)
             if p.exists():
-                os.chmod(str(p), 0o666)
-        os.chmod(str(DATA_DIR), 0o777)
+                os.chmod(str(p), 0o664)
+        os.chmod(str(DATA_DIR), 0o775)
     except Exception:
         pass
 
     print(f"[DB] SQLite database initialized at {DB_PATH}")
+
+_cached_columns = set()
+
+def get_log_entries_columns(force_reload=False) -> set:
+    """Returns cached column names for log_entries to avoid repetitive PRAGMA calls."""
+    global _cached_columns
+    if not _cached_columns or force_reload:
+        conn = None
+        try:
+            conn = get_connection()
+            c = conn.cursor()
+            c.execute("PRAGMA table_info(log_entries);")
+            _cached_columns = {row["name"] for row in c.fetchall()}
+        except Exception:
+            pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    return set(_cached_columns)
+
 
 if __name__ == "__main__":
     init_db()

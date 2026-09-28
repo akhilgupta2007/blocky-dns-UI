@@ -106,14 +106,21 @@ async def get_integration():
 
 @router.post("/integration")
 def update_integration(req: IntegrationUpdateRequest):
+    clean_path = req.blocky_config_path.strip()
+    if clean_path:
+        if ".." in clean_path or not (clean_path.endswith(".yml") or clean_path.endswith(".yaml")):
+            raise HTTPException(status_code=400, detail="Invalid config path: must end with .yml or .yaml and cannot contain '..'")
+
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('integration_mode', ?);", (req.integration_mode,))
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_api_url', ?);", (req.blocky_api_url.strip().rstrip("/"),))
-    if req.blocky_config_path.strip():
-        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_config_path', ?);", (req.blocky_config_path.strip(),))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('integration_mode', ?);", (req.integration_mode,))
+        cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_api_url', ?);", (req.blocky_api_url.strip().rstrip("/"),))
+        if clean_path:
+            cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('blocky_config_path', ?);", (clean_path,))
+        conn.commit()
+    finally:
+        conn.close()
 
     sync_config_from_db()
     return {"success": True, "integration_mode": req.integration_mode}

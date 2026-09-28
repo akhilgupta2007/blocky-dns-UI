@@ -287,7 +287,7 @@ function formatResolvedAnswer(answerStr, responseType, rowId) {
   const firstIp = parts[0];
 
   if (parts.length === 1) {
-    return `<code class="ip-badge-single" style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${firstIp}</code>`;
+    return `<code class="ip-badge-single" style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${escapeHtml(firstIp)}</code>`;
   }
 
   const remainingCount = parts.length - 1;
@@ -296,7 +296,7 @@ function formatResolvedAnswer(answerStr, responseType, rowId) {
   return `
     <div class="resolved-ip-cell" style="display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 100%;">
       <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-        <code style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${firstIp}</code>
+        <code style="color: var(--accent-cyan); font-family: monospace; font-size: 0.78rem; font-weight: 500; word-break: break-all;">${escapeHtml(firstIp)}</code>
         <button type="button" class="btn-ip-expand" onclick="toggleIpExpansion('${uid}', this)" title="Click to view all ${parts.length} resolved records" style="background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.35); border-radius: 4px; padding: 1px 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; user-select: none; white-space: nowrap;">
           +${remainingCount} more
         </button>
@@ -305,7 +305,7 @@ function formatResolvedAnswer(answerStr, responseType, rowId) {
         ${parts.map((ip, idx) => `
           <div style="display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 0.74rem; color: ${idx === 0 ? 'var(--accent-cyan)' : 'var(--text-muted)'};">
             <span style="color: var(--text-dim); font-size: 0.65rem; min-width: 16px;">#${idx + 1}</span>
-            <span style="word-break: break-all;">${ip}</span>
+            <span style="word-break: break-all;">${escapeHtml(ip)}</span>
           </div>
         `).join("")}
       </div>
@@ -436,19 +436,28 @@ function renderLogRow(r) {
   const isBlockedType = (r.response_type === "BLOCKED" || r.response_type === "REBIND");
   const reasonColor = isBlockedType ? "var(--accent-red)" : "var(--text-dim)";
 
+  const safeLocalTime = escapeHtml(localTimeStr);
+  const safeClientName = escapeHtml(r.client_name || r.client_ip);
+  const safeClientIp = escapeHtml(r.client_ip);
+  const safeQuestion = escapeHtml(r.question);
+  const safeQType = escapeHtml(qType);
+  const safeResponseType = escapeHtml(r.response_type);
+  const safeReasonText = escapeHtml(reasonText);
+  const safeDuration = escapeHtml(r.duration_ms);
+
   return `
-    <tr id="log-row-${r.id || 'live'}" class="query-log-row" style="transition: background 0.3s ease;">
-      <td class="col-time desktop-only" style="color: var(--text-muted); font-size: 0.82rem; font-family: monospace; white-space: nowrap;" title="Raw timestamp: ${r.request_ts}">${localTimeStr}</td>
+    <tr id="log-row-${escapeHtml(r.id) || 'live'}" class="query-log-row" style="transition: background 0.3s ease;">
+      <td class="col-time desktop-only" style="color: var(--text-muted); font-size: 0.82rem; font-family: monospace; white-space: nowrap;" title="Raw timestamp: ${escapeHtml(r.request_ts)}">${safeLocalTime}</td>
       <td class="col-client">
         <div class="client-cell-content">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span>${icon}</span>
-            <span style="font-weight: 600;">${r.client_name || r.client_ip}</span>
-            <span class="client-ip-sub" style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">(${r.client_ip})</span>
+            <span style="font-weight: 600;">${safeClientName}</span>
+            <span class="client-ip-sub" style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">(${safeClientIp})</span>
           </div>
           <div class="mobile-card-meta">
-            <span>${localTimeStr}</span>
-            <span style="color: var(--accent-cyan); margin-left: 6px;">⚡ ${r.duration_ms}ms</span>
+            <span>${safeLocalTime}</span>
+            <span style="color: var(--accent-cyan); margin-left: 6px;">⚡ ${safeDuration}ms</span>
           </div>
         </div>
       </td>
@@ -456,12 +465,12 @@ function renderLogRow(r) {
         <div class="domain-cell-content">
           <div class="domain-header-line">
             <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-              <span class="domain-text">${r.question}</span>
-              <span class="pill pill-qtype" style="font-size: 0.65rem; padding: 1px 5px; background: rgba(255,255,255,0.06); text-transform: uppercase;">${qType}</span>
+              <span class="domain-text">${safeQuestion}</span>
+              <span class="pill pill-qtype" style="font-size: 0.65rem; padding: 1px 5px; background: rgba(255,255,255,0.06); text-transform: uppercase;">${safeQType}</span>
             </div>
-            <span class="pill ${pillClass} mobile-status-tag">${r.response_type}</span>
+            <span class="pill ${pillClass} mobile-status-tag">${safeResponseType}</span>
           </div>
-          ${reasonText ? `<div class="block-reason-text" style="font-size: 0.72rem; color: ${reasonColor}; margin-top: 2px;">${reasonText}</div>` : ""}
+          ${safeReasonText ? `<div class="block-reason-text" style="font-size: 0.72rem; color: ${reasonColor}; margin-top: 2px;">${safeReasonText}</div>` : ""}
         </div>
       </td>
       <td class="col-answer">
@@ -470,18 +479,35 @@ function renderLogRow(r) {
           ${answerHtml}
         </div>
       </td>
-      <td class="col-status desktop-only"><span class="pill ${pillClass}">${r.response_type}</span></td>
-      <td class="col-latency desktop-only" style="color: var(--text-muted); font-size: 0.82rem;">⚡ ${r.duration_ms}ms</td>
+      <td class="col-status desktop-only"><span class="pill ${pillClass}">${safeResponseType}</span></td>
+      <td class="col-latency desktop-only" style="color: var(--text-muted); font-size: 0.82rem;">⚡ ${safeDuration}ms</td>
       <td class="col-actions">
         <div class="actions-button-group">
-          <button class="btn btn-secondary btn-sm" onclick="window.openWhoisModal('${r.question}')" title="Inspect WHOIS & Domain Intelligence">ℹ️ Whois</button>
-          <button class="btn btn-secondary btn-sm btn-allow" onclick="quickAddRule('whitelist', '${r.question}')" title="Whitelist domain">✓ Allow</button>
-          <button class="btn btn-danger btn-sm btn-block" onclick="quickAddRule('blacklist', '${r.question}')" title="Blacklist domain">✕ Block</button>
+          <button class="btn btn-secondary btn-sm" data-domain="${safeQuestion}" onclick="window.openWhoisModal(this.dataset.domain)" title="Inspect WHOIS & Domain Intelligence">ℹ️ Whois</button>
+          <button class="btn btn-secondary btn-sm btn-allow" data-domain="${safeQuestion}" onclick="quickAddRule('whitelist', this.dataset.domain)" title="Whitelist domain">✓ Allow</button>
+          <button class="btn btn-danger btn-sm btn-block" data-domain="${safeQuestion}" onclick="quickAddRule('blacklist', this.dataset.domain)" title="Blacklist domain">✕ Block</button>
         </div>
       </td>
     </tr>
   `;
 }
+
+function closeLiveStream() {
+  if (liveStreamSource) {
+    liveStreamSource.close();
+    liveStreamSource = null;
+    const dot = document.getElementById("liveStreamPulseDot");
+    const txt = document.getElementById("liveStreamBtnText");
+    const btn = document.getElementById("btnToggleLiveStream");
+    if (dot) dot.style.display = "none";
+    if (txt) txt.textContent = "🔴 Live Stream";
+    if (btn) {
+      btn.classList.remove("btn-cyan");
+      btn.classList.add("btn-secondary");
+    }
+  }
+}
+window.closeLiveStream = closeLiveStream;
 
 function toggleLiveStream() {
   const btn = document.getElementById("btnToggleLiveStream");
@@ -489,14 +515,7 @@ function toggleLiveStream() {
   const txt = document.getElementById("liveStreamBtnText");
 
   if (liveStreamSource) {
-    liveStreamSource.close();
-    liveStreamSource = null;
-    if (dot) dot.style.display = "none";
-    if (txt) txt.textContent = "🔴 Live Stream";
-    if (btn) {
-      btn.classList.remove("btn-cyan");
-      btn.classList.add("btn-secondary");
-    }
+    closeLiveStream();
     showToast("Live query streaming paused");
     return;
   }

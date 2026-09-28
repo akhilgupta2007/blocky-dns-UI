@@ -31,7 +31,7 @@ class TestBlockyDnsHub(unittest.TestCase):
         from database import get_connection
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE response_type IN ('BLOCKED', 'REBIND');")
+        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE request_ts >= datetime('now', '-24 hours') AND response_type IN ('BLOCKED', 'REBIND');")
         if cur.fetchone()["cnt"] == 0:
             cur.execute("""
             INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question, answer)
@@ -39,7 +39,7 @@ class TestBlockyDnsHub(unittest.TestCase):
             """)
             conn.commit()
 
-        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE response_type = 'RESOLVED';")
+        cur.execute("SELECT COUNT(*) as cnt FROM log_entries WHERE request_ts >= datetime('now', '-24 hours') AND response_type = 'RESOLVED';")
         if cur.fetchone()["cnt"] == 0:
             cur.execute("""
             INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question, answer)

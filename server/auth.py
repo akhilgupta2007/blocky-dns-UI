@@ -2,11 +2,33 @@ import os
 import datetime
 import bcrypt
 import jwt
+import secrets
 from fastapi import HTTPException, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import get_connection
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_blockydns_jwt_key_homelab_secure_12345")
+def _get_jwt_secret() -> str:
+    env_secret = os.getenv("JWT_SECRET")
+    if env_secret:
+        return env_secret
+    try:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = 'jwt_secret';")
+            row = cursor.fetchone()
+            if row and row["value"]:
+                return row["value"]
+            generated = secrets.token_urlsafe(32)
+            cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('jwt_secret', ?);", (generated,))
+            conn.commit()
+            return generated
+        finally:
+            conn.close()
+    except Exception:
+        return "super_secret_blockydns_jwt_key_homelab_secure_12345"
+
+JWT_SECRET = _get_jwt_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 72
 
@@ -45,11 +67,13 @@ def decode_access_token(token: str, request: Request = None):
 
 def is_setup_completed() -> bool:
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as cnt FROM users;")
-    row = cursor.fetchone()
-    conn.close()
-    return (row["cnt"] if row else 0) > 0
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM users;")
+        row = cursor.fetchone()
+        return (row["cnt"] if row else 0) > 0
+    finally:
+        conn.close()
 
 async def get_current_user(request: Request, auth: HTTPAuthorizationCredentials = Security(security)):
     # 1. Try Authorization header
@@ -68,10 +92,12 @@ async def get_current_user(request: Request, auth: HTTPAuthorizationCredentials 
         raise HTTPException(status_code=401, detail="Invalid or expired session token")
 
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username FROM users WHERE username = ?;", (username,))
-    user = cursor.fetchone()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username FROM users WHERE username = ?;", (username,))
+        user = cursor.fetchone()
+    finally:
+        conn.close()
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")

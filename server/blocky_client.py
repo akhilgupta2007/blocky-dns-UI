@@ -39,6 +39,12 @@ def get_blocky_config_path() -> Path:
     val = get_setting("blocky_config_path")
     if val:
         val = val.strip()
+        # Security sanitization: reject directory traversal attempts
+        if ".." in val:
+            return BASE_DIR / "config" / "config.yml"
+        # Enforce valid YAML extension
+        if not (val.endswith(".yml") or val.endswith(".yaml")):
+            return BASE_DIR / "config" / "config.yml"
         # Guard against Windows drive paths inside Linux containers
         if os.name != 'nt' and (':' in val or '\\' in val):
             return BASE_DIR / "config" / "config.yml"
@@ -315,7 +321,7 @@ def sync_config_from_db():
         upstream_strategy = "parallel_best"
 
     # 7. Fetch caching, prefetching & EDNS settings
-    cursor.execute("SELECT key, value FROM settings WHERE key IN ('caching_enabled', 'cache_min_ttl', 'cache_max_ttl', 'cache_neg_ttl', 'prefetching_enabled', 'prefetch_threshold', 'edns_anonymize_ecs');")
+    cursor.execute("SELECT key, value FROM settings WHERE key IN ('caching_enabled', 'cache_min_ttl', 'cache_max_ttl', 'cache_neg_ttl', 'prefetching_enabled', 'prefetch_threshold', 'edns_anonymize_ecs', 'dnssec_enabled');")
     cache_settings = {row["key"]: row["value"] for row in cursor.fetchall()}
 
     conn.close()

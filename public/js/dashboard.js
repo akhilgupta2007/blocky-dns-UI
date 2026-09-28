@@ -9,7 +9,13 @@ let pauseSecondsRemaining = 0;
 
 async function loadDashboard() {
   try {
-    const summary = await apiRequest("/api/stats/summary");
+    const [summary, timeline, topDomains, topDevices] = await Promise.all([
+      apiRequest("/api/stats/summary"),
+      apiRequest("/api/stats/timeline"),
+      apiRequest("/api/stats/top-domains"),
+      apiRequest("/api/stats/top-devices")
+    ]);
+
     if (!summary) return;
     cachedSummaryData = summary;
 
@@ -38,17 +44,14 @@ async function loadDashboard() {
     drawDonutChart(summary.query_distribution, summary.total_queries_24h, summary.blocked_queries_24h);
 
     // Timeline Area Chart
-    const timeline = await apiRequest("/api/stats/timeline");
     if (timeline) drawTimelineChart(timeline);
 
     // Top Blocked Domains
-    const topDomains = await apiRequest("/api/stats/top-domains");
     if (topDomains && topDomains.top_blocked) {
       renderTopBlocked(topDomains.top_blocked);
     }
 
     // Client Device Breakdown
-    const topDevices = await apiRequest("/api/stats/top-devices");
     if (topDevices) {
       renderDashboardDevices(topDevices);
     }
@@ -337,10 +340,11 @@ function renderTopBlocked(blockedList) {
   const maxCount = Math.max(...blockedList.map(b => b.count), 1);
   container.innerHTML = blockedList.slice(0, 6).map(b => {
     const pct = Math.round((b.count / maxCount) * 100);
+    const safeDomain = escapeHtml(b.domain);
     return `
-      <div onclick="filterLogsByDomain('${b.domain}')" style="cursor: pointer; padding: 4px 0; border-radius: 4px; transition: background 0.15s ease;" title="Click to view queries for ${b.domain}" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+      <div data-domain="${safeDomain}" onclick="filterLogsByDomain(this.dataset.domain)" style="cursor: pointer; padding: 4px 0; border-radius: 4px; transition: background 0.15s ease;" title="Click to view queries for ${safeDomain}" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
         <div style="display: flex; justify-content: space-between; font-size: 0.84rem; margin-bottom: 4px;">
-          <span style="font-family: monospace; color: var(--text-main);">${b.domain}</span>
+          <span style="font-family: monospace; color: var(--text-main);">${safeDomain}</span>
           <span style="color: var(--accent-red); font-weight: 600;">${b.count.toLocaleString()}</span>
         </div>
         <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: var(--radius-full); overflow: hidden;">
@@ -369,20 +373,22 @@ function renderDashboardDevices(devices) {
 
   tbody.innerHTML = devices.map(d => {
     const icon = iconMap[d.icon] || "🔌";
+    const safeIp = escapeHtml(d.client_ip);
+    const safeName = escapeHtml(d.name);
     return `
-      <tr class="dashboard-device-card" onclick="filterLogsByClient('${d.client_ip}')" style="cursor: pointer;" title="Click to filter Query Log for ${d.name} (${d.client_ip})">
+      <tr class="dashboard-device-card" data-ip="${safeIp}" onclick="filterLogsByClient(this.dataset.ip)" style="cursor: pointer;" title="Click to filter Query Log for ${safeName} (${safeIp})">
         <td class="col-device-name">
           <div class="dash-device-top">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 1.15rem;">${icon}</span>
-              <span style="font-weight: 600; color: var(--text-main); font-size: 0.88rem;">${d.name}</span>
-              <code class="client-ip-sub" style="font-size: 0.74rem; color: var(--accent-cyan); font-family: monospace;">(${d.client_ip})</code>
+              <span style="font-weight: 600; color: var(--text-main); font-size: 0.88rem;">${safeName}</span>
+              <code class="client-ip-sub" style="font-size: 0.74rem; color: var(--accent-cyan); font-family: monospace;">(${safeIp})</code>
             </div>
             <span class="pill blocked mobile-status-tag" style="font-size: 0.72rem;">${d.blocked_percent}% Blocked</span>
           </div>
         </td>
         <td class="col-device-ip desktop-only">
-          <code style="color: var(--accent-cyan); font-family: monospace; font-size: 0.8rem;">${d.client_ip}</code>
+          <code style="color: var(--accent-cyan); font-family: monospace; font-size: 0.8rem;">${safeIp}</code>
         </td>
         <td class="col-device-total desktop-only" style="font-weight: 600;">${d.total_queries.toLocaleString()}</td>
         <td class="col-device-blocked desktop-only" style="color: var(--accent-red); font-weight: 600;">${d.blocked_queries.toLocaleString()}</td>

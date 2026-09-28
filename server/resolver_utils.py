@@ -1,6 +1,4 @@
 import ipaddress
-import re
-import urllib.parse
 from typing import Tuple, Optional
 from benchmark import benchmark_single_doh, benchmark_single_dot, benchmark_single_udp
 

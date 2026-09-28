@@ -41,26 +41,31 @@ function renderBlocklists(lists) {
       ? `<strong>${ruleCount.toLocaleString()}</strong> rules` 
       : `<span style="color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 4px;">⚡ Counting rules...</span>`;
 
+    const safeName = escapeHtml(l.name);
+    const safeCategory = escapeHtml(l.category);
+    const safeUrl = escapeHtml(l.url);
+    const safeId = escapeHtml(l.id);
+
     return `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
         <div style="flex: 1; padding-right: 12px;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-weight: 600; font-size: 0.92rem;">${l.name}</span>
-            <span style="font-size: 0.72rem; color: var(--text-dim);">${l.category}</span>
+            <span style="font-weight: 600; font-size: 0.92rem;">${safeName}</span>
+            <span style="font-size: 0.72rem; color: var(--text-dim);">${safeCategory}</span>
           </div>
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span>${ruleText}</span> &bull; 
             <span>🕒 Updated: ${formatBlocklistDate(l.last_updated)}</span> &bull; 
-            <span style="font-family: monospace; opacity: 0.75; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.url}">${l.url}</span>
+            <span style="font-family: monospace; opacity: 0.75; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safeUrl}">${safeUrl}</span>
           </div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 12px;">
           <label class="switch">
-            <input type="checkbox" ${l.enabled ? "checked" : ""} onchange="window.handleToggleList(${l.id}, this.checked)">
+            <input type="checkbox" ${l.enabled ? "checked" : ""} data-id="${safeId}" onchange="window.handleToggleList(Number(this.dataset.id), this.checked)">
             <span class="slider"></span>
           </label>
-          <button class="btn btn-danger btn-sm" onclick="window.handleDeleteList(${l.id})" title="Remove Blocklist">✕</button>
+          <button class="btn btn-danger btn-sm" data-id="${safeId}" onclick="window.handleDeleteList(Number(this.dataset.id))" title="Remove Blocklist">✕</button>
         </div>
       </div>
     `;
@@ -175,6 +180,9 @@ function renderRules(rules) {
 
   tbody.innerHTML = filtered.map(r => {
     const target = r.id != null ? r.id : r.domain;
+    const safeTarget = escapeHtml(target);
+    const safeDomain = escapeHtml(r.domain);
+    const safeComment = escapeHtml(r.comment || "");
     const typeColor = isWhitelist ? "var(--accent-green)" : "var(--accent-red)";
     const typeBadge = isWhitelist
       ? `<span class="pill" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); font-size: 0.72rem;">Whitelist</span>`
@@ -187,8 +195,8 @@ function renderRules(rules) {
       scopeBadge = `<span class="pill" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.7rem;">Regex</span>`;
     }
 
-    const note = r.comment
-      ? `<span style="font-size: 0.78rem; color: var(--text-muted);">${r.comment}</span>`
+    const note = safeComment
+      ? `<span style="font-size: 0.78rem; color: var(--text-muted);">${safeComment}</span>`
       : `<span style="font-size: 0.78rem; color: var(--text-dim);">-</span>`;
 
     return `
@@ -198,14 +206,14 @@ function renderRules(rules) {
           <div class="rule-card-top">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;">
               <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
-              <code class="rule-domain-code" style="color: ${typeColor};">${r.domain}</code>
+              <code class="rule-domain-code" style="color: ${typeColor};">${safeDomain}</code>
               ${scopeBadge}
             </div>
-            <button type="button" class="btn btn-danger btn-sm" onclick="window.handleDeleteRule('${target}')" style="padding: 3px 8px; font-size: 0.8rem;" title="Delete rule">
+            <button type="button" class="btn btn-danger btn-sm" data-target="${safeTarget}" onclick="window.handleDeleteRule(this.dataset.target)" style="padding: 3px 8px; font-size: 0.8rem;" title="Delete rule">
               ✕
             </button>
           </div>
-          ${r.comment ? `<div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 4px;">${r.comment}</div>` : ""}
+          ${safeComment ? `<div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 4px;">${safeComment}</div>` : ""}
         </td>
 
         <!-- DESKTOP VIEW -->
@@ -213,7 +221,7 @@ function renderRules(rules) {
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
             <code style="font-family: monospace; font-size: 0.84rem; font-weight: 600; color: ${typeColor}; word-break: break-all;">
-              ${r.domain}
+              ${safeDomain}
             </code>
             ${scopeBadge}
           </div>
@@ -221,7 +229,7 @@ function renderRules(rules) {
         <td class="desktop-only">${typeBadge}</td>
         <td class="desktop-only">${note}</td>
         <td class="desktop-only" style="text-align: right;">
-          <button type="button" class="btn btn-icon" onclick="window.handleDeleteRule('${target}')" style="color: var(--accent-red); padding: 4px 8px; font-size: 0.85rem;" title="Delete rule">
+          <button type="button" class="btn btn-icon" data-target="${safeTarget}" onclick="window.handleDeleteRule(this.dataset.target)" style="color: var(--accent-red); padding: 4px 8px; font-size: 0.85rem;" title="Delete rule">
             ✕
           </button>
         </td>

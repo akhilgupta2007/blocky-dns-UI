@@ -14,13 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# Ensure server directory is in sys.path and permissions are open
-try:
-    os.umask(0)
-except Exception:
-    pass
-
 BASE_DIR = Path(__file__).resolve().parent
+
 
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "routes"))
@@ -149,18 +144,36 @@ def index_page(request: Request):
 
 # Background HTTP to HTTPS Redirector
 def start_http_redirect_server():
-    class RedirectHandler(http.server.SimpleHTTPRequestHandler):
+    class RedirectHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            host = self.headers.get("Host", "localhost").split(":")[0]
-            target_url = f"https://{host}:{HTTPS_PORT}{self.path}"
+            self.close_connection = True
+            import re
+            raw_host = self.headers.get("Host", "localhost").split(":")[0].strip()
+            # Strict validation: alphanumeric, dots, and hyphens only
+            if not re.match(r"^[a-zA-Z0-9\.\-]+$", raw_host):
+                raw_host = "localhost"
+            clean_path = self.path.split("\r")[0].split("\n")[0]
+            target_url = f"https://{raw_host}:{HTTPS_PORT}{clean_path}"
             self.send_response(301)
             self.send_header("Location", target_url)
+            self.send_header("Connection", "close")
             self.end_headers()
 
+        def do_HEAD(self):
+            self.do_GET()
+
+        def do_POST(self):
+            self.do_GET()
+
+        def log_message(self, format, *args):
+            # Suppress console logging to prevent spam and unnecessary I/O
+            pass
+
     try:
+        socketserver.TCPServer.allow_reuse_address = True
         with socketserver.TCPServer(("", HTTP_PORT), RedirectHandler) as httpd:
             print(f"[Redirect] HTTP server listening on port {HTTP_PORT} -> Redirecting to HTTPS {HTTPS_PORT}")
-            httpd.serve_forever()
+            httpd.serve_forever(poll_interval=1.0)
     except Exception as e:
         print(f"[Redirect] Note: HTTP redirect server on port {HTTP_PORT} could not start: {e}")
 

@@ -28,9 +28,6 @@ def parse_adguard_rule(raw_line: str, default_type: str = "blacklist"):
         rule_type = "blacklist"
         line = line[2:]
 
-    if line.startswith("||"):
-        line = line[2:]
-
     # Strip modifiers ($important, $dnstype, etc.)
     if "$" in line:
         line = line.split("$", 1)[0]
@@ -54,11 +51,13 @@ def parse_adguard_rule(raw_line: str, default_type: str = "blacklist"):
 @router.get("")
 def list_rules():
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM custom_rules ORDER BY id DESC;")
-    rules = [dict(r) for r in cursor.fetchall()]
-    conn.close()
-    return rules
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM custom_rules ORDER BY id DESC;")
+        rules = [dict(r) for r in cursor.fetchall()]
+        return rules
+    finally:
+        conn.close()
 
 @router.post("/add")
 async def add_rule(req: AddRuleRequest):
@@ -77,19 +76,20 @@ async def add_rule(req: AddRuleRequest):
     is_regex = 1 if (domain.startswith("/") and domain.endswith("/")) else 0
 
     conn = get_connection()
-    cursor = conn.cursor()
-    # Check if already exists
-    cursor.execute("SELECT id FROM custom_rules WHERE rule_type = ? AND domain = ?;", (rule_type, domain))
-    existing = cursor.fetchone()
-    if existing:
-        cursor.execute("UPDATE custom_rules SET enabled = 1 WHERE id = ?;", (existing["id"],))
-    else:
-        cursor.execute("""
-        INSERT INTO custom_rules (rule_type, domain, is_wildcard, is_regex, enabled, comment, created_at)
-        VALUES (?, ?, ?, ?, 1, ?, datetime('now'));
-        """, (rule_type, domain, is_wildcard, is_regex, req.comment))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM custom_rules WHERE rule_type = ? AND domain = ?;", (rule_type, domain))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute("UPDATE custom_rules SET enabled = 1 WHERE id = ?;", (existing["id"],))
+        else:
+            cursor.execute("""
+            INSERT INTO custom_rules (rule_type, domain, is_wildcard, is_regex, enabled, comment, created_at)
+            VALUES (?, ?, ?, ?, 1, ?, datetime('now'));
+            """, (rule_type, domain, is_wildcard, is_regex, req.comment))
+        conn.commit()
+    finally:
+        conn.close()
 
     sync_config_from_db()
     await refresh_lists()
@@ -104,39 +104,57 @@ async def import_rules(req: ImportRulesRequest):
     skipped = 0
 
     conn = get_connection()
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, rule_type, domain, enabled FROM custom_rules;")
+        existing_rules = {(r["rule_type"], r["domain"]): (r["id"], r["enabled"]) for r in cursor.fetchall()}
 
-    for raw in lines:
-        r_type, domain = parse_adguard_rule(raw, req.default_type)
-        if not domain:
-            continue
+        to_enable_ids = []
+        to_insert = []
+        seen_in_batch = set()
 
-        is_wildcard = 1 if domain.startswith("*.") else 0
-        is_regex = 1 if (domain.startswith("/") and domain.endswith("/")) else 0
+        for raw in lines:
+            r_type, domain = parse_adguard_rule(raw, req.default_type)
+            if not domain:
+                continue
 
-        cursor.execute("SELECT id, enabled FROM custom_rules WHERE rule_type = ? AND domain = ?;", (r_type, domain))
-        row = cursor.fetchone()
-        if row:
-            if row["enabled"] == 0:
-                cursor.execute("UPDATE custom_rules SET enabled = 1 WHERE id = ?;", (row["id"],))
+            rule_key = (r_type, domain)
+            if rule_key in seen_in_batch:
+                skipped += 1
+                continue
+            seen_in_batch.add(rule_key)
+
+            if rule_key in existing_rules:
+                rule_id, enabled = existing_rules[rule_key]
+                if enabled == 0:
+                    to_enable_ids.append((rule_id,))
+                    if r_type == "whitelist":
+                        count_w += 1
+                    else:
+                        count_b += 1
+                else:
+                    skipped += 1
+            else:
+                is_wildcard = 1 if domain.startswith("*.") else 0
+                is_regex = 1 if (domain.startswith("/") and domain.endswith("/")) else 0
+                to_insert.append((r_type, domain, is_wildcard, is_regex))
                 if r_type == "whitelist":
                     count_w += 1
                 else:
                     count_b += 1
-            else:
-                skipped += 1
-        else:
-            cursor.execute("""
+
+        if to_enable_ids:
+            cursor.executemany("UPDATE custom_rules SET enabled = 1 WHERE id = ?;", to_enable_ids)
+
+        if to_insert:
+            cursor.executemany("""
             INSERT INTO custom_rules (rule_type, domain, is_wildcard, is_regex, enabled, comment, created_at)
             VALUES (?, ?, ?, ?, 1, 'Imported AdGuard Rule', datetime('now'));
-            """, (r_type, domain, is_wildcard, is_regex))
-            if r_type == "whitelist":
-                count_w += 1
-            else:
-                count_b += 1
+            """, to_insert)
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
     if count_w > 0 or count_b > 0:
         sync_config_from_db()
@@ -154,14 +172,16 @@ async def import_rules(req: ImportRulesRequest):
 @router.delete("/{target}")
 async def delete_rule(target: str):
     conn = get_connection()
-    cursor = conn.cursor()
-    target_clean = target.strip()
-    if target_clean.isdigit():
-        cursor.execute("DELETE FROM custom_rules WHERE id = ?;", (int(target_clean),))
-    else:
-        cursor.execute("DELETE FROM custom_rules WHERE domain = ?;", (target_clean.lower(),))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        target_clean = target.strip()
+        if target_clean.isdigit():
+            cursor.execute("DELETE FROM custom_rules WHERE id = ?;", (int(target_clean),))
+        else:
+            cursor.execute("DELETE FROM custom_rules WHERE domain = ?;", (target_clean.lower(),))
+        conn.commit()
+    finally:
+        conn.close()
 
     sync_config_from_db()
     await refresh_lists()

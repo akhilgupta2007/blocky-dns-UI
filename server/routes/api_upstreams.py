@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, schedule_blocky_restart, restart_blocky_container
+from blocky_client import sync_config_from_db, schedule_blocky_restart
 from benchmark import benchmark_single_doh, benchmark_single_dot, benchmark_single_udp
 from resolver_utils import normalize_resolver, probe_and_normalize_resolver
 

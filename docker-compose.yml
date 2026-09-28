@@ -28,6 +28,7 @@ services:
 
   # 2. BlockyDNS Hub Dashboard & Secured HTTPS API
   hub:
+    build: .
     image: ghcr.io/akhilgupta2007/blocky-dns-ui:latest
     container_name: blockydns-hub
     restart: unless-stopped
@@ -52,6 +53,12 @@ services:
     depends_on:
       blocky:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k -f https://127.0.0.1:3443/api/auth/status || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     networks:
       - blocky-net
 
