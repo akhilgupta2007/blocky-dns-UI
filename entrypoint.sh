@@ -4,6 +4,10 @@ set -e
 # Ensure a permissive umask so files/dirs created by Python and Blocky are freely accessible
 umask 0000
 
+echo "=================================================="
+echo "          BlockyDNS Hub v1.1.0 (Docker)"
+echo "=================================================="
+
 # Ensure target volume directories exist inside the container
 mkdir -p /app/data /app/certs /app/config
 

@@ -48,9 +48,14 @@ HTTP_PORT = int(os.getenv("HTTP_PORT", "3000"))
 HTTPS_PORT = int(os.getenv("HTTPS_PORT", "3443"))
 ENABLE_HTTPS = os.getenv("ENABLE_HTTPS", "true").lower() == "true"
 
+APP_VERSION = "v1.1.0"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    print("==================================================")
+    print(f"          BlockyDNS Hub {APP_VERSION}")
+    print("==================================================")
     print("[Server] Initializing BlockyDNS Hub database & schema...")
     try:
         init_db()

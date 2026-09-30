@@ -470,6 +470,10 @@ docker compose up -d --build
 * **Responsive Off-Canvas Navigation**: Smooth slide-over navigation drawer for mobile and tablet viewport widths.
 * **Table Wrapping**: Responsive horizontal scroll and flexible metadata badge formatting across homelab device screens.
 
+#### 🏷️ Release Version Tracking Across UI & Containers
+* **Visible Release Badges**: Added `v1.1.0` release badges next to the sidebar brand header, in the sidebar footer, and within the General System Settings card.
+* **Container Startup Banners**: Added ASCII startup banners to `entrypoint.sh` and `server/main.py` console logs upon container initialization.
+
 ---
 
 ### [v1.0.0] - 2026-09-01
