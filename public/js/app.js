@@ -209,14 +209,14 @@ function switchView(viewName, subTab = null) {
 
   let activeNav = null;
   if (canonicalView === "protection" && targetSubTab) {
-    if (targetSubTab === "adlists") activeNav = document.getElementById("navProtectionAdlists");
+    if (targetSubTab === "adlists") activeNav = document.getElementById("navProtection") || document.getElementById("navProtectionAdlists");
     else if (targetSubTab === "customRules") activeNav = document.getElementById("navProtectionCustom");
     else if (targetSubTab === "blockedServices") activeNav = document.getElementById("navProtectionServices");
   } else if (canonicalView === "routing" && targetSubTab) {
-    if (targetSubTab === "localDns") activeNav = document.getElementById("navRoutingLocalDns");
+    if (targetSubTab === "localDns") activeNav = document.getElementById("navRouting") || document.getElementById("navRoutingLocalDns");
     else if (targetSubTab === "smartDns") activeNav = document.getElementById("navRoutingSmartDns");
   } else if (canonicalView === "settings" && targetSubTab) {
-    if (targetSubTab === "resolvers") activeNav = document.getElementById("navSettingsResolvers");
+    if (targetSubTab === "resolvers") activeNav = document.getElementById("navSettings") || document.getElementById("navSettingsResolvers");
     else if (targetSubTab === "engine") activeNav = document.getElementById("navSettingsEngine");
     else if (targetSubTab === "tools") activeNav = document.getElementById("navSettingsTools");
   }

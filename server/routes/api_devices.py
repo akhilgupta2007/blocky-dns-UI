@@ -29,7 +29,7 @@ def list_devices():
             SUM(CASE WHEN l.response_type = 'BLOCKED' THEN 1 ELSE 0 END),
             MIN(l.request_ts),
             MAX(l.request_ts)
-        FROM (SELECT * FROM log_entries ORDER BY id DESC LIMIT 500) l
+        FROM (SELECT * FROM log_entries ORDER BY rowid DESC LIMIT 500) l
         LEFT JOIN devices d ON l.client_ip = d.client_ip
         WHERE d.client_ip IS NULL AND l.client_ip IS NOT NULL AND TRIM(l.client_ip) != ''
         GROUP BY l.client_ip;

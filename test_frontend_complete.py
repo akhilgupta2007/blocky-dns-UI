@@ -115,6 +115,11 @@ def run_comprehensive_frontend_tests():
 
         # Check Quick-Pause Shield
         print("Testing Quick Pause Shield pills...")
+        shield_toggle = page.locator("#btnShieldToggle")
+        if shield_toggle.is_visible():
+            shield_toggle.click()
+            time.sleep(0.3)
+
         pause_1m_btn = page.locator("button.btn-pause-pill:has-text('1 min')")
         if pause_1m_btn.is_visible():
             pause_1m_btn.click()
