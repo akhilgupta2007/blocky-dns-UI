@@ -1463,9 +1463,7 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(13, 19, 33, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-full);
   padding: 5px;
@@ -1473,6 +1471,7 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  box-shadow: var(--shadow-card);
 }
 
 .subnav-segmented-bar::-webkit-scrollbar {
@@ -1483,7 +1482,7 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 7px 16px;
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--text-muted);
@@ -1496,6 +1495,13 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
   user-select: none;
 }
 
+.subnav-pill svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
 .subnav-pill:hover {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.05);
@@ -1503,9 +1509,9 @@ body.is-busy button, body.is-busy input, body.is-busy select, body.is-busy a {
 
 .subnav-pill.active {
   color: var(--accent-green);
-  background: rgba(16, 185, 129, 0.16);
-  border-color: rgba(16, 185, 129, 0.38);
-  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.15);
 }
 
 .subnav-pill .badge-mini {
