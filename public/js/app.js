@@ -207,10 +207,27 @@ function switchView(viewName, subTab = null) {
   // Update Desktop & Mobile Nav items
   document.querySelectorAll(".nav-item, .bottom-nav-item").forEach(el => el.classList.remove("active"));
 
+  let activeNav = null;
+  if (canonicalView === "protection" && targetSubTab) {
+    if (targetSubTab === "adlists") activeNav = document.getElementById("navProtectionAdlists");
+    else if (targetSubTab === "customRules") activeNav = document.getElementById("navProtectionCustom");
+    else if (targetSubTab === "blockedServices") activeNav = document.getElementById("navProtectionServices");
+  } else if (canonicalView === "routing" && targetSubTab) {
+    if (targetSubTab === "localDns") activeNav = document.getElementById("navRoutingLocalDns");
+    else if (targetSubTab === "smartDns") activeNav = document.getElementById("navRoutingSmartDns");
+  } else if (canonicalView === "settings" && targetSubTab) {
+    if (targetSubTab === "resolvers") activeNav = document.getElementById("navSettingsResolvers");
+    else if (targetSubTab === "engine") activeNav = document.getElementById("navSettingsEngine");
+    else if (targetSubTab === "tools") activeNav = document.getElementById("navSettingsTools");
+  }
+
   const navSuffix = canonicalView.charAt(0).toUpperCase() + canonicalView.slice(1);
-  const activeNav = document.getElementById("nav" + navSuffix);
-  const activeBottomNav = document.getElementById("bottomNav" + navSuffix);
+  if (!activeNav) {
+    activeNav = document.getElementById("nav" + navSuffix);
+  }
   if (activeNav) activeNav.classList.add("active");
+
+  const activeBottomNav = document.getElementById("bottomNav" + navSuffix);
   if (activeBottomNav) activeBottomNav.classList.add("active");
 
   // Update Sections

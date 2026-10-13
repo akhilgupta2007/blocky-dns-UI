@@ -139,15 +139,28 @@ table, .kpi-value, .badge, .pill, .status-badge, .stat-value, .shield-status-tex
   overflow-y: auto;
 }
 
+.nav-group-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 14px 12px 4px 12px;
+  user-select: none;
+}
+.nav-group-label:first-child {
+  padding-top: 0;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-radius: var(--radius-md);
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -161,16 +174,21 @@ table, .kpi-value, .badge, .pill, .status-badge, .stat-value, .shield-status-tex
 }
 
 .nav-item.active {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.1);
+  color: #f8fafc;
+  border-color: rgba(16, 185, 129, 0.3);
+  font-weight: 600;
+}
+
+.nav-item.active svg {
   color: var(--accent-green);
-  border-color: var(--border-accent);
-  box-shadow: 0 0 15px -2px var(--accent-green-glow);
 }
 
 .nav-item svg {
   width: 18px;
   height: 18px;
   stroke-width: 2;
+  flex-shrink: 0;
 }
 
 .sidebar-footer {
