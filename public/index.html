@@ -86,25 +86,67 @@
           <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open Navigation" title="Menu">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
-          <div id="blockingStatusBadge" class="status-badge">
-            <div class="pulse-dot"></div>
-            <span id="blockingStatusText">Blocking Active</span>
+
+          <!-- Unified Header Shield Pod with Quick Popover -->
+          <div id="headerShieldPod" class="shield-pod">
+            <div id="blockingStatusBadge" class="status-badge shield-badge-btn" onclick="toggleShieldPopover(event)" title="Shield Protection Status & Controls">
+              <button id="btnShieldToggle" type="button" class="shield-toggle-trigger" aria-label="Toggle Shield Controls">
+                <span id="shieldStatusDotHeader" class="pulse-dot"></span>
+                <span id="blockingStatusText">Shield Active</span>
+                <span id="headerPauseCountdown" class="pill header-countdown-pill" style="display: none;"></span>
+                <svg class="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 13px; height: 13px; margin-left: 2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </button>
+            </div>
+
+            <button id="btnResumeProtectionHeader" type="button" class="btn btn-resume btn-sm" onclick="handleResumeBlocking()" style="display: none; padding: 4px 10px; font-size: 0.78rem;">
+              ▶ Resume
+            </button>
+
+            <!-- Dropdown Popover Menu -->
+            <div id="shieldPopoverMenu" class="shield-popover" style="display: none;">
+              <div class="shield-popover-header">
+                <span class="popover-title">DNS Protection Controls</span>
+                <span class="popover-subtext">Active network-wide</span>
+              </div>
+              <div class="shield-popover-section">
+                <span class="popover-section-label">Pause Protection For:</span>
+                <div class="pause-options-grid">
+                  <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('1m'); closeShieldPopover();">1 min</button>
+                  <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('10m'); closeShieldPopover();">10 min</button>
+                  <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('30m'); closeShieldPopover();">30 min</button>
+                  <button type="button" class="btn-pause-pill" onclick="handlePauseBlocking('1h'); closeShieldPopover();">1 hour</button>
+                  <button type="button" class="btn-pause-pill pause-indefinitely" onclick="handlePauseBlocking('permanent'); closeShieldPopover();">Permanently</button>
+                </div>
+              </div>
+              <div class="shield-popover-footer">
+                <button type="button" class="btn btn-cyan btn-sm" onclick="triggerListRefresh(); closeShieldPopover();" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                  <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <span>Recompile & Refresh Rules</span>
+                </button>
+              </div>
+            </div>
           </div>
+
           <div class="ssl-badge">
-            <span>🔒</span>
+            <svg style="width: 12px; height: 12px; color: var(--accent-green);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
             <span>TLS 1.3 Encrypted</span>
           </div>
         </div>
 
         <div class="header-actions">
-          <button id="btnPause5m" class="btn btn-secondary btn-sm header-action-btn" onclick="pauseBlockingPrompt()" title="Pause Blocking">
-            <span class="btn-icon">⏸️</span><span class="btn-text"> Pause Blocking</span>
+          <div class="header-search-bar" onclick="focusQuickSearch()" title="Jump to search in Query Log (Ctrl+K)">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 14px; height: 14px; color: var(--text-dim);"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" id="headerQuickSearch" class="header-search-input" placeholder="Quick search domain or IP..." onkeydown="handleHeaderSearch(event)">
+            <kbd class="header-kbd">Ctrl+K</kbd>
+          </div>
+
+          <button id="btnRefreshAll" class="btn btn-secondary btn-sm header-action-btn" onclick="triggerListRefresh()" title="Refresh Lists">
+            <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
           </button>
-          <button id="btnRefreshAll" class="btn btn-cyan btn-sm header-action-btn" onclick="triggerListRefresh()" title="Refresh Lists">
-            <span class="btn-icon">🔄</span><span class="btn-text"> Refresh Lists</span>
-          </button>
-          <button class="btn btn-secondary btn-sm header-action-btn" onclick="openPasswordModal()" title="Change Admin Password">
-            <span class="btn-icon">🔑</span><span class="btn-text"> Change Password</span>
+
+          <button class="user-avatar-btn" onclick="openPasswordModal()" title="Admin Profile (Click to change password)">
+            <span class="user-avatar-dot"></span>
+            <span>Admin</span>
           </button>
         </div>
       </header>

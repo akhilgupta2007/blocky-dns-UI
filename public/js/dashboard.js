@@ -139,16 +139,26 @@ async function handleResumeBlocking() {
 function startPauseTimer(totalSeconds) {
   clearInterval(pauseCountdownInterval);
   const badge = document.getElementById("pauseCountdownBadge");
-  if (!badge) return;
+  const headerBadge = document.getElementById("headerPauseCountdown");
+  const headerResumeBtn = document.getElementById("btnResumeProtectionHeader");
 
   if (totalSeconds === null) {
-    badge.style.display = "inline-flex";
-    badge.textContent = "⏸ Paused Indefinitely";
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.textContent = "⏸ Paused Indefinitely";
+    }
+    if (headerBadge) {
+      headerBadge.style.display = "inline-flex";
+      headerBadge.textContent = "⏸ Paused";
+    }
+    if (headerResumeBtn) headerResumeBtn.style.display = "inline-flex";
     return;
   }
 
   pauseSecondsRemaining = totalSeconds;
-  badge.style.display = "inline-flex";
+  if (badge) badge.style.display = "inline-flex";
+  if (headerBadge) headerBadge.style.display = "inline-flex";
+  if (headerResumeBtn) headerResumeBtn.style.display = "inline-flex";
   updateTimerDisplay();
 
   pauseCountdownInterval = setInterval(() => {
@@ -167,7 +177,9 @@ function startPauseTimer(totalSeconds) {
   function updateTimerDisplay() {
     const mins = Math.floor(pauseSecondsRemaining / 60);
     const secs = pauseSecondsRemaining % 60;
-    badge.textContent = `⏸ Paused (${mins}:${secs < 10 ? '0' : ''}${secs})`;
+    const txt = `⏸ Paused (${mins}:${secs < 10 ? '0' : ''}${secs})`;
+    if (badge) badge.textContent = txt;
+    if (headerBadge) headerBadge.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
 }
 
@@ -176,6 +188,8 @@ function syncProtectionStatusUI(active) {
   const text = document.getElementById("shieldStatusText");
   const resumeBtn = document.getElementById("btnResumeProtection");
   const countdownBadge = document.getElementById("pauseCountdownBadge");
+  const headerResumeBtn = document.getElementById("btnResumeProtectionHeader");
+  const headerCountdown = document.getElementById("headerPauseCountdown");
 
   if (active) {
     if (dot) {
@@ -184,6 +198,8 @@ function syncProtectionStatusUI(active) {
     if (text) text.textContent = "Shield Active";
     if (resumeBtn) resumeBtn.style.display = "none";
     if (countdownBadge) countdownBadge.style.display = "none";
+    if (headerResumeBtn) headerResumeBtn.style.display = "none";
+    if (headerCountdown) headerCountdown.style.display = "none";
     clearInterval(pauseCountdownInterval);
     pauseCountdownInterval = null;
   } else {
@@ -192,6 +208,7 @@ function syncProtectionStatusUI(active) {
     }
     if (text) text.textContent = "Protection Paused";
     if (resumeBtn) resumeBtn.style.display = "inline-flex";
+    if (headerResumeBtn) headerResumeBtn.style.display = "inline-flex";
     if (countdownBadge && !pauseCountdownInterval && countdownBadge.style.display === "none") {
       countdownBadge.style.display = "inline-flex";
       countdownBadge.textContent = "⏸ Paused";

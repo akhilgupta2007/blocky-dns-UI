@@ -376,15 +376,82 @@ async function triggerListRefresh() {
   }
 }
 
+function toggleShieldPopover(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById("shieldPopoverMenu");
+  if (!menu) return;
+  const isShown = menu.style.display !== "none";
+  menu.style.display = isShown ? "none" : "block";
+}
+
+function closeShieldPopover() {
+  const menu = document.getElementById("shieldPopoverMenu");
+  if (menu) menu.style.display = "none";
+}
+
+window.toggleShieldPopover = toggleShieldPopover;
+window.closeShieldPopover = closeShieldPopover;
+
+document.addEventListener("click", (e) => {
+  const pod = document.getElementById("headerShieldPod");
+  if (pod && !pod.contains(e.target)) {
+    closeShieldPopover();
+  }
+});
+
+function focusQuickSearch() {
+  const input = document.getElementById("headerQuickSearch");
+  if (input) input.focus();
+}
+window.focusQuickSearch = focusQuickSearch;
+
+function handleHeaderSearch(e) {
+  if (e.key === "Enter") {
+    const val = e.target.value.trim();
+    if (val) {
+      switchView("queryLog");
+      const logSearch = document.getElementById("logSearchInput");
+      if (logSearch) {
+        logSearch.value = val;
+        if (typeof handleLogFilterChange === "function") handleLogFilterChange();
+      }
+    }
+  }
+}
+window.handleHeaderSearch = handleHeaderSearch;
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    const input = document.getElementById("headerQuickSearch");
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+});
+
 function updateBlockingBadge(active) {
   const badge = document.getElementById("blockingStatusBadge");
   const text = document.getElementById("blockingStatusText");
+  const resumeBtn = document.getElementById("btnResumeProtectionHeader");
+  const countdown = document.getElementById("headerPauseCountdown");
+
   if (active) {
-    badge.className = "status-badge";
-    text.textContent = "Blocking Active";
+    if (badge) {
+      badge.classList.remove("paused");
+      badge.classList.add("active");
+    }
+    if (text) text.textContent = "Shield Active";
+    if (resumeBtn) resumeBtn.style.display = "none";
+    if (countdown) countdown.style.display = "none";
   } else {
-    badge.className = "status-badge paused";
-    text.textContent = "Blocking Paused";
+    if (badge) {
+      badge.classList.remove("active");
+      badge.classList.add("paused");
+    }
+    if (text) text.textContent = "Shield Paused";
+    if (resumeBtn) resumeBtn.style.display = "inline-flex";
   }
 }
 
