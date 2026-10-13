@@ -1,37 +1,39 @@
-/* BlockyDNS Hub - Modern Glassmorphic Design System */
+/* BlockyDNS Hub - Obsidian Slate & Emerald Engineering Design System */
 :root {
-  --bg-main: #0a0e17;
-  --bg-sidebar: #0f1523;
-  --bg-card: rgba(19, 27, 46, 0.75);
-  --bg-card-hover: rgba(26, 37, 63, 0.85);
-  --bg-input: rgba(13, 19, 33, 0.9);
+  --bg-main: #0b0f17;
+  --bg-sidebar: #0e131f;
+  --bg-card: #111622;
+  --bg-card-hover: #161c2b;
+  --bg-input: #0a0d14;
   
   --border-glass: rgba(255, 255, 255, 0.08);
   --border-accent: rgba(16, 185, 129, 0.35);
-  --border-cyan: rgba(6, 182, 212, 0.35);
+  --border-cyan: rgba(14, 165, 233, 0.35);
 
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
   --accent-green: #10b981;
-  --accent-green-glow: rgba(16, 185, 129, 0.2);
-  --accent-cyan: #06b6d4;
-  --accent-cyan-glow: rgba(6, 182, 212, 0.2);
+  --accent-green-glow: rgba(16, 185, 129, 0.15);
+  --accent-cyan: #0ea5e9;
+  --accent-cyan-glow: rgba(14, 165, 233, 0.15);
   --accent-violet: #8b5cf6;
   --accent-amber: #f59e0b;
   --accent-red: #ef4444;
-  --accent-red-glow: rgba(239, 68, 68, 0.2);
+  --accent-red-glow: rgba(239, 68, 68, 0.15);
 
   --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-full: 9999px;
 
-  --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px var(--border-glass);
-  --shadow-glow: 0 0 20px -3px var(--accent-green-glow);
-  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --inner-rim: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.45), var(--inner-rim);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.55), var(--inner-rim);
+  --shadow-glow: 0 0 16px -2px var(--accent-green-glow);
+  --transition-fast: 0.15s cubic-bezier(0.2, 0, 0, 1);
+  --transition-smooth: 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 
 * {
@@ -47,9 +49,11 @@ body {
   min-height: 100vh;
   display: flex;
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.04) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.04) 0%, transparent 40%);
+}
+
+/* Tabular figures for numbers, latencies, and table rows to prevent layout shifting */
+table, .kpi-value, .badge, .pill, .status-badge, .stat-value, .shield-status-text {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Scrollbar */
@@ -315,17 +319,16 @@ body {
 
 .card {
   background: var(--bg-card);
-  backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
   padding: 22px;
   box-shadow: var(--shadow-card);
-  transition: all var(--transition-smooth);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .card:hover {
   background: var(--bg-card-hover);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .kpi-card {
