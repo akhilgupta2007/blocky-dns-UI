@@ -43,4 +43,7 @@ test_output/
 data_test/
 config/config_test.yml
 
+# Temporary Agent Planning Artifacts
+.superpowers/
+
 

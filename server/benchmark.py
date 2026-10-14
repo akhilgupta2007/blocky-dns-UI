@@ -78,14 +78,14 @@ async def benchmark_single_udp(endpoint: str, domain: str = "wikipedia.org") -> 
         return {"latency_ms": None, "status": f"Error: {type(e).__name__}"}
 
 async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", client: httpx.AsyncClient = None) -> dict:
-    # 1. Primary RFC 8484 DNS-over-HTTPS via HTTP/2 POST
+    # 1. Primary RFC 8484 DNS-over-HTTPS via dnspython
     try:
         elapsed_ms = await asyncio.to_thread(_sync_doh_query, endpoint, domain)
         return {"latency_ms": elapsed_ms, "status": "online"}
     except Exception:
         pass
 
-    # 2. Secondary fallback via httpx (for custom JSON/GET endpoints)
+    # 2. Secondary RFC 8484 fallback via httpx (with bootstrap IP & TLS SNI support)
     start = time.perf_counter()
     q = dns.message.make_query(domain, "A")
     wire = q.to_wire()
@@ -97,6 +97,10 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
     if "/" not in clean_endpoint.replace("https://", "").replace("http://", ""):
         clean_endpoint = f"{clean_endpoint}/dns-query"
 
+    parsed = urllib.parse.urlparse(clean_endpoint)
+    host = parsed.hostname or ""
+    bootstrap_ip = DOH_BOOTSTRAP_MAP.get(host)
+
     close_client = False
     if client is None:
         try:
@@ -105,44 +109,68 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
             client = httpx.AsyncClient(timeout=4.0, verify=False)
         close_client = True
     try:
-        # RFC 8484 GET with ?dns=
-        try:
-            url = f"{clean_endpoint}?dns={b64_wire}"
-            get_headers = {"Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"}
-            resp = await client.get(url, headers=get_headers)
-            if resp.status_code == 200:
-                elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-                return {"latency_ms": elapsed_ms, "status": "online"}
-        except Exception:
-            pass
+        # 2a. RFC 8484 GET with ?dns= (testing both bootstrap IP with SNI and direct endpoint)
+        get_candidates = []
+        if bootstrap_ip:
+            get_candidates.append((
+                f"https://{bootstrap_ip}/dns-query?dns={b64_wire}",
+                {"Host": host, "Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"},
+                {"sni_hostname": host}
+            ))
+        get_candidates.append((
+            f"{clean_endpoint}?dns={b64_wire}",
+            {"Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"},
+            {"sni_hostname": host} if host else {}
+        ))
 
-        # RFC 8484 POST
-        try:
-            post_headers = {
-                "Content-Type": "application/dns-message",
-                "Accept": "application/dns-message",
-                "User-Agent": "BlockyDNS-Hub/1.0"
-            }
-            resp = await client.post(clean_endpoint, content=wire, headers=post_headers)
-            if resp.status_code == 200:
-                elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-                return {"latency_ms": elapsed_ms, "status": "online"}
-        except Exception:
-            pass
+        for get_url, get_headers, ext in get_candidates:
+            try:
+                resp = await client.get(get_url, headers=get_headers, extensions=ext)
+                if resp.status_code == 200:
+                    elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+                    return {"latency_ms": elapsed_ms, "status": "online"}
+            except Exception:
+                pass
 
-        # JSON DoH fallback
-        try:
-            json_url = clean_endpoint.replace("/dns-query", "/resolve") if "dns.google" in clean_endpoint else clean_endpoint
-            resp = await client.get(
-                f"{json_url}?name={domain}&type=A",
-                headers={"Accept": "application/dns-json", "User-Agent": "BlockyDNS-Hub/1.0"}
-            )
-            if resp.status_code == 200:
-                elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-                return {"latency_ms": elapsed_ms, "status": "online"}
-            return {"latency_ms": None, "status": f"HTTP {resp.status_code}"}
-        except Exception as e:
-            return {"latency_ms": None, "status": f"Error: {type(e).__name__}"}
+        # 2b. RFC 8484 POST with application/dns-message
+        post_candidates = []
+        if bootstrap_ip:
+            post_candidates.append((
+                f"https://{bootstrap_ip}/dns-query",
+                {"Host": host, "Content-Type": "application/dns-message", "Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"},
+                {"sni_hostname": host}
+            ))
+        post_candidates.append((
+            clean_endpoint,
+            {"Content-Type": "application/dns-message", "Accept": "application/dns-message", "User-Agent": "BlockyDNS-Hub/1.0"},
+            {"sni_hostname": host} if host else {}
+        ))
+
+        for post_url, post_headers, ext in post_candidates:
+            try:
+                resp = await client.post(post_url, content=wire, headers=post_headers, extensions=ext)
+                if resp.status_code == 200:
+                    elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+                    return {"latency_ms": elapsed_ms, "status": "online"}
+            except Exception:
+                pass
+
+        # 2c. JSON DoH fallback (ONLY for providers supporting Google/Cloudflare proprietary JSON API)
+        if "dns.google" in clean_endpoint or "cloudflare" in clean_endpoint:
+            try:
+                json_url = clean_endpoint.replace("/dns-query", "/resolve") if "dns.google" in clean_endpoint else clean_endpoint
+                resp = await client.get(
+                    f"{json_url}?name={domain}&type=A",
+                    headers={"Accept": "application/dns-json", "User-Agent": "BlockyDNS-Hub/1.0"}
+                )
+                if resp.status_code == 200:
+                    elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+                    return {"latency_ms": elapsed_ms, "status": "online"}
+                return {"latency_ms": None, "status": f"HTTP {resp.status_code}"}
+            except Exception:
+                pass
+
+        return {"latency_ms": None, "status": "Error: Timeout/Unreachable"}
 
     finally:
         if close_client:

@@ -8,7 +8,7 @@
 [![DNS Engine](https://img.shields.io/badge/DNS%20Engine-Blocky%20(Go)-00ADD8?logo=go)](https://github.com/0xERR0R/blocky)
 [![Security](https://img.shields.io/badge/Security-TLS%201.3%20%2B%20Strict%20DoH%2FDoT-00f5d4)](#-security--anti-sniffing-shield)
 [![RAM Footprint](https://img.shields.io/badge/Total%20RAM-%7E118%20MB-purple)](#-performance-benchmarks-raspberry-pi-1gb-ram)
-[![Release](https://img.shields.io/badge/Release-v1.1.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.1-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -441,6 +441,15 @@ docker compose up -d --build
 * **Unified Settings Access**: Consolidated repetitive SQLite configuration queries into a single, clean `get_setting()` helper across the core service engine.
 * **Leak-Proof Database Lifecycle**: Hardened SQLite connection handling across asynchronous background tasks to guarantee zero connection leaks or `ResourceWarning` notices.
 * **Automated Seed Log Fixtures**: Embedded automated 24-hour test log seeding in `test_backend.py` to ensure analytics, stats, and filter test assertions pass deterministically.
+
+---
+
+### [v1.1.1] - 2026-10-14
+
+#### 🔒 Upstream DoH RFC 8484 Hardening & SNI Bootstrapping
+* **Direct TLS SNI Injection**: Added explicit `sni_hostname` and HTTP/2 headers to DNS-over-HTTPS bootstrap resolutions. Bypasses container DNS loops and resolves connection drops when querying Quad9, Cloudflare Security, and AdGuard.
+* **Elimination of Spurious HTTP 400 Errors**: Restricted proprietary JSON DoH fallback queries strictly to Google and Cloudflare endpoints. Prevents strict RFC 8484 wireformat upstreams (e.g., Quad9) from rejecting non-standard JSON requests with `HTTP 400`.
+* **Clean Status Reporting**: When an upstream DoH resolver is unreachable, the Diagnostics & Tools benchmark reports a clear `Error: Timeout/Unreachable` status instead of misleading HTTP failure codes.
 
 ---
 
