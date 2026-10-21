@@ -497,8 +497,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial load
   loadDashboard();
-  // Auto-refresh summary every 10s
+  // Auto-refresh summary every 10s only when tab is visible
   setInterval(() => {
-    if (currentView === "dashboard") loadDashboard();
+    if (!document.hidden && currentView === "dashboard") {
+      loadDashboard();
+    }
   }, 10000);
+
+  // Instantly refresh when user returns to this tab
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && currentView === "dashboard") {
+      loadDashboard();
+    }
+  });
 });

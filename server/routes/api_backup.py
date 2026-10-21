@@ -127,8 +127,10 @@ async def import_backup(file: UploadFile = File(...)):
                 """, (s["id"], s["name"], s["category"], s["icon"], s["domains_json"], s.get("enabled", 0)))
 
         if "settings" in data and isinstance(data["settings"], dict):
+            # Sensitive or host-specific system settings must not be overwritten via backup
+            IGNORED_SETTINGS_RESTORE = {"jwt_secret", "blocky_config_path"}
             for k, v in data["settings"].items():
-                if k == "jwt_secret":
+                if k in IGNORED_SETTINGS_RESTORE:
                     continue
                 cursor.execute("""
                 INSERT OR REPLACE INTO settings (key, value)

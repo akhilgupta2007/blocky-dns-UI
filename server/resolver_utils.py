@@ -170,3 +170,43 @@ async def probe_and_normalize_resolver(endpoint: str, protocol: Optional[str] = 
 
     result["status"] = "offline_or_unreachable"
     return result
+
+
+import socket
+import urllib.parse
+
+def is_safe_public_url(url: str) -> bool:
+    """Validates that a URL is a valid public HTTP/HTTPS endpoint and not targeting internal/cloud metadata networks."""
+    try:
+        parsed = urllib.parse.urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = (parsed.hostname or "").strip().lower()
+        if not host:
+            return False
+        if host in ("localhost", "127.0.0.1", "::1", "169.254.169.254", "metadata.google.internal") or host.endswith(".local") or host.endswith(".lan") or host.endswith(".internal"):
+            return False
+
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+            return True
+        except ValueError:
+            pass
+
+        # Resolve hostname and verify resolved IPs are public
+        addr_info = socket.getaddrinfo(host, None)
+        for item in addr_info:
+            ip_str = item[4][0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                    return False
+            except ValueError:
+                pass
+        return True
+    except Exception:
+        # If domain cannot be resolved, return False
+        return False
+

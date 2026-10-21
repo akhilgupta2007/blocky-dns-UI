@@ -21,9 +21,10 @@ DEFAULT_CANDIDATES = [
 
 # SSL Context for DoT benchmark lookups (RFC 7858 compliant ALPN 'dot')
 DOT_SSL_CTX = ssl.create_default_context()
-DOT_SSL_CTX.check_hostname = False
-DOT_SSL_CTX.verify_mode = ssl.CERT_NONE
+DOT_SSL_CTX.check_hostname = True
+DOT_SSL_CTX.verify_mode = ssl.CERT_REQUIRED
 try:
+    DOT_SSL_CTX.load_default_certs()
     DOT_SSL_CTX.set_alpn_protocols(["dot"])
 except Exception:
     pass
@@ -52,7 +53,7 @@ def _sync_doh_query(endpoint: str, domain: str = "wikipedia.org") -> float:
 
     q = dns.message.make_query(domain, "A")
     t0 = time.perf_counter()
-    r = dns.query.https(q, clean_endpoint, timeout=4.0, bootstrap_address=bootstrap, verify=False, post=True)
+    r = dns.query.https(q, clean_endpoint, timeout=4.0, bootstrap_address=bootstrap, verify=True, post=True)
     return round((time.perf_counter() - t0) * 1000, 1)
 
 async def benchmark_single_udp(endpoint: str, domain: str = "wikipedia.org") -> dict:
@@ -104,9 +105,9 @@ async def benchmark_single_doh(endpoint: str, domain: str = "wikipedia.org", cli
     close_client = False
     if client is None:
         try:
-            client = httpx.AsyncClient(http2=True, timeout=4.0, verify=False)
+            client = httpx.AsyncClient(http2=True, timeout=4.0, verify=True)
         except Exception:
-            client = httpx.AsyncClient(timeout=4.0, verify=False)
+            client = httpx.AsyncClient(timeout=4.0, verify=True)
         close_client = True
     try:
         # 2a. RFC 8484 GET with ?dns= (testing both bootstrap IP with SNI and direct endpoint)

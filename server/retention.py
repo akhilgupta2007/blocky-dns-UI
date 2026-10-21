@@ -17,6 +17,12 @@ def prune_old_logs(days: int = None) -> int:
     """, (days,))
     deleted_count = cursor.rowcount
 
+    # Also clean up expired revoked session tokens (older than 3 days JWT lifetime)
+    try:
+        cursor.execute("DELETE FROM revoked_tokens WHERE revoked_at < datetime('now', '-3 days');")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
     print(f"[Retention] Pruned {deleted_count} log entries older than {days} days")

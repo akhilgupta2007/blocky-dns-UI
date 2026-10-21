@@ -132,9 +132,18 @@ async function populateDeviceFilter() {
   } catch (err) {}
 }
 
-function handleLogFilterChange() {
-  logCurrentPage = 1;
-  refreshQueryLogs();
+let _logFilterDebounce = null;
+function handleLogFilterChange(immediate = false) {
+  if (_logFilterDebounce) clearTimeout(_logFilterDebounce);
+  if (immediate === true) {
+    logCurrentPage = 1;
+    refreshQueryLogs();
+  } else {
+    _logFilterDebounce = setTimeout(() => {
+      logCurrentPage = 1;
+      refreshQueryLogs();
+    }, 250);
+  }
 }
 
 function changeLogPage(delta) {
@@ -452,7 +461,7 @@ function renderLogRow(r) {
         <div class="client-cell-content">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span>${icon}</span>
-            <span style="font-weight: 600;">${safeClientName}</span>
+            <span style="font-weight: 600; cursor: pointer;" class="client-name-link" onclick="openDeviceFromLog('${safeClientIp}')" title="Configure device ${safeClientName} (${safeClientIp})">${safeClientName}</span>
             <span class="client-ip-sub" style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace;">(${safeClientIp})</span>
           </div>
           <div class="mobile-card-meta">
@@ -484,13 +493,23 @@ function renderLogRow(r) {
       <td class="col-actions">
         <div class="actions-button-group">
           <button class="btn btn-secondary btn-sm" data-domain="${safeQuestion}" onclick="window.openWhoisModal(this.dataset.domain)" title="Inspect WHOIS & Domain Intelligence">ℹ️ Whois</button>
-          <button class="btn btn-secondary btn-sm btn-allow" data-domain="${safeQuestion}" onclick="quickAddRule('whitelist', this.dataset.domain)" title="Whitelist domain">✓ Allow</button>
-          <button class="btn btn-danger btn-sm btn-block" data-domain="${safeQuestion}" onclick="quickAddRule('blacklist', this.dataset.domain)" title="Blacklist domain">✕ Block</button>
+          ${isBlockedType ? `
+            <button class="btn btn-secondary btn-sm btn-allow" data-domain="${safeQuestion}" onclick="quickAddRule('whitelist', this.dataset.domain)" title="Whitelist domain (Unblock)" style="color: var(--accent-green); border-color: rgba(16, 185, 129, 0.4);">✓ Allow</button>
+          ` : `
+            <button class="btn btn-danger btn-sm btn-block" data-domain="${safeQuestion}" onclick="quickAddRule('blacklist', this.dataset.domain)" title="Blacklist domain (Block)">✕ Block</button>
+          `}
         </div>
       </td>
     </tr>
   `;
 }
+
+function openDeviceFromLog(clientIp) {
+  if (typeof window.switchView === "function") {
+    window.switchView("devices");
+  }
+}
+window.openDeviceFromLog = openDeviceFromLog;
 
 function closeLiveStream() {
   if (liveStreamSource) {

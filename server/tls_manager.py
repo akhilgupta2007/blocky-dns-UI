@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CERTS_DIR = Path(os.getenv("CERTS_DIR", str(BASE_DIR / "certs")))
 CERTS_DIR.mkdir(parents=True, exist_ok=True)
 try:
-    os.chmod(str(CERTS_DIR), 0o777)
+    os.chmod(str(CERTS_DIR), 0o750)
 except Exception:
     pass
 CERT_PATH = CERTS_DIR / "cert.pem"

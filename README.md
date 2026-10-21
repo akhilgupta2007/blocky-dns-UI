@@ -8,7 +8,7 @@
 [![DNS Engine](https://img.shields.io/badge/DNS%20Engine-Blocky%20(Go)-00ADD8?logo=go)](https://github.com/0xERR0R/blocky)
 [![Security](https://img.shields.io/badge/Security-TLS%201.3%20%2B%20Strict%20DoH%2FDoT-00f5d4)](#-security--anti-sniffing-shield)
 [![RAM Footprint](https://img.shields.io/badge/Total%20RAM-%7E118%20MB-purple)](#-performance-benchmarks-raspberry-pi-1gb-ram)
-[![Release](https://img.shields.io/badge/Release-v1.1.1-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
+[![Release](https://img.shields.io/badge/Release-v1.2.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -427,6 +427,37 @@ docker compose up -d --build
 #### 🚀 Developer & Local Deployment Tooling
 * **1-Command Homelab Deployer**: Added `deploy.ps1` and `deploy.bat` to synchronize local workspaces directly to remote homelab instances over SCP/SSH with zero git/registry pollution.
 * **Full Local Compose Build Support**: Updated `docker-compose.yml` with `build: .` context and explicit container healthchecks for seamless local builds.
+
+---
+
+### [v1.2.0] - 2026-10-17
+
+#### 🔒 Security Vulnerability Audit & Defense-in-Depth Hardening
+* **Docker Socket Mount Elimination**: Removed `/var/run/docker.sock` mount from the management container in `docker-compose.yml` and `docker-compose.ghcr.yml`, completely closing root host privilege escalation risks.
+* **Internal Engine Port Isolation**: Removed external host mapping for Blocky's unauthenticated API port `4000:4000`. The engine API is now accessible exclusively within Docker's internal private network.
+* **Dynamic Cryptographic JWT Secrets**: Eliminated static default JWT secrets. The hub automatically generates and persists a cryptographically secure 32-byte secret in SQLite upon first initialization.
+* **Strict RFC 1918 CORS Boundaries**: Replaced insecure wildcard CORS with credentials by restricting allowed origins strictly to explicit localhost and RFC 1918 private subnets (`192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12`).
+* **Active JWT Session Revocation**: Implemented a `revoked_tokens` table in SQLite; tokens are immediately invalidated in database upon `/api/auth/logout` before their natural expiration.
+* **Brute-Force Rate Limiting & Password Policies**: Enforced in-memory sliding-window rate limiting (5 attempts / 60s) on `/api/auth/login` and an 8-character minimum password length.
+* **Server-Side Request Forgery (SSRF) Defense**: Integrated URL safety validation (`is_safe_public_url`) blocking loopback, internal IPs, cloud metadata endpoints (`169.254.169.254`), and non-HTTP schemes during remote adlist and upstream additions.
+* **Path Traversal & Settings Restore Protection**: Filtered sensitive configuration parameters (`jwt_secret`, `blocky_config_path`) from being overwritten during JSON backup restores.
+* **Strict TLS Verification in Upstream Benchmarks**: Enforced `verify=True`, `DOT_SSL_CTX.verify_mode = ssl.CERT_REQUIRED`, and hostname validation in `server/benchmark.py`.
+* **File & Directory Permission Hardening**: Enforced restrictive file permissions (`0750` for directories, `0640` for sensitive files, and `umask 0022` on container startup).
+
+#### ⚡ Performance & Polling Optimizations
+* **Input Debouncing**: Applied a 250ms debounce on Query Log search inputs to eliminate backend request thrashing while typing.
+* **SSE Real-Time DOM Capping**: Bound real-time live stream rows to `logLimit` (50 rows) to prevent browser memory leaks during heavy query volumes.
+* **Page Visibility API Throttling**: Added `document.hidden` event hooks to pause background stats and log polling when the browser tab is minimized or inactive.
+* **HTTP GZip Compression**: Integrated FastAPI `GZipMiddleware(minimum_size=1000)` reducing wire payloads by up to 70%.
+
+#### 🎨 UI Streamlining, Decluttering & Client Device Access
+* **Vector SVG Favicon**: Added crisp emerald-cyan security shield favicon (`public/favicon.svg`) linked in all HTML templates and served via backend endpoints, fixing generic Chrome tab icons.
+* **Sub-Menu Reorganization**: Reorganized sidebar into 4 intuitive functional pillars; promoted **Client Devices** to the primary **Activity & Traffic** group with an active device counter badge.
+* **Universal Access to Client Devices**: Added direct `Manage All Devices ➔` button in Dashboard widget, clickable client IP links in Query Log rows, and enhanced KPI hover affordances.
+* **Client Device Activity Breakdown Scrollbar**: Removed `LIMIT 8` from the stats backend to return all active devices from the last 24h, wrapped in a `.table-scrollable` container with sticky headers.
+* **Column Header Sorting**: Added interactive sorting across Client Devices & Reverse DNS (PTR) with true IPv4 numerical octet math, total queries, and blocked rates.
+* **Contextual Query Log Action Buttons**: Cleaned up conflicting actions—shows only `✓ Allow` (Whitelist) on blocked rows and `✕ Block` (Blacklist) on resolved/cached rows.
+* **Dark Mode Calendar Picker Fix**: Configured `color-scheme: dark;` and custom filter brightness on datetime-local inputs, making the calendar picker button clearly visible and clickable.
 
 ---
 

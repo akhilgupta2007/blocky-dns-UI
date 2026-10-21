@@ -284,8 +284,8 @@ def sync_config_from_db():
             f.write(f"{clean_d}\n")
 
     try:
-        os.chmod(str(blacklist_file), 0o666)
-        os.chmod(str(whitelist_file), 0o666)
+        os.chmod(str(blacklist_file), 0o644)
+        os.chmod(str(whitelist_file), 0o644)
     except Exception:
         pass
 
@@ -460,8 +460,8 @@ def sync_config_from_db():
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
     try:
-        os.chmod(str(config_path), 0o666)
-        os.chmod(str(config_path.parent), 0o777)
+        os.chmod(str(config_path), 0o644)
+        os.chmod(str(config_path.parent), 0o750)
     except Exception:
         pass
     print(f"[Blocky] Synced active config to {config_path}")

@@ -1023,11 +1023,83 @@ table.modern-table tr[onclick]:hover td {
   font-size: 0.9rem;
   outline: none;
   transition: border-color var(--transition-fast);
+  color-scheme: dark;
 }
 
 .form-input:focus, .form-select:focus {
   border-color: var(--accent-green);
   box-shadow: 0 0 12px var(--accent-green-glow);
+}
+
+/* Dark mode native calendar picker indicator styling */
+input[type="date"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.9) brightness(1.2);
+  opacity: 0.85;
+  padding: 3px;
+  border-radius: 4px;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(1) brightness(1.4);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Scrollable Tables with Sticky Header */
+.table-scrollable {
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.table-scrollable thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--border-glass);
+}
+
+/* Sortable Table Headers */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.sortable-th:hover {
+  color: var(--accent-cyan) !important;
+}
+
+.sort-indicator {
+  display: inline-block;
+  font-size: 0.72rem;
+  margin-left: 4px;
+  opacity: 0.45;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.sortable-th.active .sort-indicator {
+  opacity: 1;
+  color: var(--accent-cyan);
+}
+
+.client-name-link {
+  transition: color var(--transition-fast);
+}
+
+.client-name-link:hover {
+  color: var(--accent-cyan) !important;
+  text-decoration: underline;
 }
 
 /* Filter bar */

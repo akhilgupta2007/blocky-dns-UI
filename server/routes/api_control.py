@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+import urllib.parse
 from auth import get_current_user
 from blocky_client import check_blocky_status, enable_blocking, pause_blocking, sync_config_from_db, restart_blocky_container, flush_cache
 from database import get_connection
@@ -85,7 +86,6 @@ async def update_settings(req: SettingsUpdateRequest):
     return {"success": True}
 
 class IntegrationUpdateRequest(BaseModel):
-
     integration_mode: str
     blocky_api_url: str
     blocky_config_path: str = ""
@@ -127,8 +127,15 @@ def update_integration(req: IntegrationUpdateRequest):
 
 @router.post("/test-integration")
 async def test_integration(req: IntegrationTestRequest):
+    url = req.blocky_api_url.strip()
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname or ""
+    # Block cloud metadata addresses and dangerous schemes
+    if parsed.scheme not in ("http", "https") or host in ("169.254.169.254", "metadata.google.internal") or host.startswith("169.254."):
+        raise HTTPException(status_code=400, detail="Disallowed target address for integration test")
+
     from blocky_client import test_blocky_connection
-    return await test_blocky_connection(req.blocky_api_url)
+    return await test_blocky_connection(url)
 
 from typing import Union
 

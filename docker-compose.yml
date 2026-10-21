@@ -8,7 +8,6 @@ services:
     ports:
       - "53:53/udp"
       - "53:53/tcp"
-      - "4000:4000"
     environment:
       - TZ=UTC
       - BLOCKY_CONFIG_FILE=/app/config
@@ -45,11 +44,10 @@ services:
       - HTTP_PORT=3000
       - HTTPS_PORT=3443
       - ENABLE_HTTPS=true
-      - JWT_SECRET=change_me_to_a_random_secure_secret_string
+      - JWT_SECRET=${JWT_SECRET:-}
     volumes:
       - ./data:/app/data
       - ./certs:/app/certs
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       blocky:
         condition: service_started

@@ -1,18 +1,18 @@
 #!/bin/sh
 set -e
 
-# Ensure a permissive umask so files/dirs created by Python and Blocky are freely accessible
-umask 0000
+# Set standard secure umask
+umask 0022
 
 echo "=================================================="
-echo "          BlockyDNS Hub v1.1.1 (Docker)"
+echo "          BlockyDNS Hub v1.2.0 (Docker)"
 echo "=================================================="
 
 # Ensure target volume directories exist inside the container
 mkdir -p /app/data /app/certs /app/config
 
-# Self-heal permissions on mounted host volumes silently
-chmod -R 777 /app/data /app/certs /app/config 2>/dev/null || true
+# Self-heal permissions on mounted host volumes safely
+chmod 755 /app/data /app/certs /app/config 2>/dev/null || true
 
 # If config.yml does not exist, initialize it from config.example.yml
 if [ ! -f "/app/config/config.yml" ]; then
@@ -22,9 +22,9 @@ if [ ! -f "/app/config/config.yml" ]; then
   fi
 fi
 
-# Ensure config.yml is readable and writable across containers
+# Ensure config.yml is readable across containers
 if [ -f "/app/config/config.yml" ]; then
-  chmod 666 /app/config/config.yml 2>/dev/null || true
+  chmod 644 /app/config/config.yml 2>/dev/null || true
 fi
 
 # Hand off execution to the main container command (CMD in Dockerfile)

@@ -7,18 +7,24 @@ from fastapi import HTTPException, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import get_connection
 
+KNOWN_DEFAULT_SECRETS = {
+    "change_me_to_a_random_secure_secret_string",
+    "super_secret_blockydns_jwt_key_homelab_secure_12345",
+    "super_secret_blockydns_jwt_key_change_me",
+}
+
 def _get_jwt_secret() -> str:
     env_secret = os.getenv("JWT_SECRET")
-    if env_secret:
-        return env_secret
+    if env_secret and env_secret.strip() and env_secret.strip() not in KNOWN_DEFAULT_SECRETS:
+        return env_secret.strip()
     try:
         conn = get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE key = 'jwt_secret';")
             row = cursor.fetchone()
-            if row and row["value"]:
-                return row["value"]
+            if row and row["value"] and row["value"].strip() not in KNOWN_DEFAULT_SECRETS:
+                return row["value"].strip()
             generated = secrets.token_urlsafe(32)
             cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('jwt_secret', ?);", (generated,))
             conn.commit()
@@ -26,7 +32,7 @@ def _get_jwt_secret() -> str:
         finally:
             conn.close()
     except Exception:
-        return "super_secret_blockydns_jwt_key_homelab_secure_12345"
+        return secrets.token_urlsafe(32)
 
 JWT_SECRET = _get_jwt_secret()
 JWT_ALGORITHM = "HS256"
@@ -75,6 +81,37 @@ def is_setup_completed() -> bool:
     finally:
         conn.close()
 
+def revoke_token(token: str):
+    if not token:
+        return
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR REPLACE INTO revoked_tokens (token_hash, revoked_at) VALUES (?, datetime('now'));", (token_hash,))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+def is_token_revoked(token: str) -> bool:
+    if not token:
+        return True
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT token_hash FROM revoked_tokens WHERE token_hash = ?;", (token_hash,))
+            row = cursor.fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
 async def get_current_user(request: Request, auth: HTTPAuthorizationCredentials = Security(security)):
     # 1. Try Authorization header
     token = None
@@ -86,6 +123,9 @@ async def get_current_user(request: Request, auth: HTTPAuthorizationCredentials 
 
     if not token:
         raise HTTPException(status_code=401, detail="Authentication credentials required")
+
+    if is_token_revoked(token):
+        raise HTTPException(status_code=401, detail="Session has been revoked or logged out")
 
     username = decode_access_token(token, request)
     if not username:

@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -48,7 +49,7 @@ HTTP_PORT = int(os.getenv("HTTP_PORT", "3000"))
 HTTPS_PORT = int(os.getenv("HTTPS_PORT", "3443"))
 ENABLE_HTTPS = os.getenv("ENABLE_HTTPS", "true").lower() == "true"
 
-APP_VERSION = "v1.1.1"
+APP_VERSION = "v1.2.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -88,12 +89,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="BlockyDNS Hub", version="1.0.0", lifespan=lifespan)
 
-# CORS
+# Compression Middleware: gzip responses >= 1000 bytes
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Hardened CORS: Disallow wildcard origin with credentials to prevent Cross-Site Hijacking
+cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
+explicit_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()] if cors_origins_env else [
+    f"http://localhost:{HTTP_PORT}",
+    f"https://localhost:{HTTPS_PORT}",
+    f"http://127.0.0.1:{HTTP_PORT}",
+    f"https://127.0.0.1:{HTTPS_PORT}",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=explicit_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -128,6 +141,11 @@ app.include_router(services_router)
 app.mount("/css", StaticFiles(directory=str(PUBLIC_DIR / "css")), name="css")
 app.mount("/js", StaticFiles(directory=str(PUBLIC_DIR / "js")), name="js")
 
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+def get_favicon():
+    return FileResponse(str(PUBLIC_DIR / "favicon.svg"), media_type="image/svg+xml")
+
 @app.get("/login")
 def login_page(request: Request):
     token = request.cookies.get("blockydns_token")
@@ -153,9 +171,20 @@ def start_http_redirect_server():
         def do_GET(self):
             self.close_connection = True
             import re
-            raw_host = self.headers.get("Host", "localhost").split(":")[0].strip()
-            # Strict validation: alphanumeric, dots, and hyphens only
-            if not re.match(r"^[a-zA-Z0-9\.\-]+$", raw_host):
+            import ipaddress
+            raw_host = self.headers.get("Host", "localhost").split(":")[0].strip().lower()
+            is_valid = False
+            if raw_host in ("localhost", "router.lan", "local", "blocky", "hub"):
+                is_valid = True
+            elif re.match(r"^[a-zA-Z0-9\.\-]+$", raw_host):
+                try:
+                    ip = ipaddress.ip_address(raw_host)
+                    if ip.is_private or ip.is_loopback:
+                        is_valid = True
+                except ValueError:
+                    if any(raw_host.endswith(s) for s in [".lan", ".local", ".home", ".internal"]):
+                        is_valid = True
+            if not is_valid:
                 raw_host = "localhost"
             clean_path = self.path.split("\r")[0].split("\n")[0]
             target_url = f"https://{raw_host}:{HTTPS_PORT}{clean_path}"

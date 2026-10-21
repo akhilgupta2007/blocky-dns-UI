@@ -189,8 +189,7 @@ def get_top_devices():
         LEFT JOIN devices d ON l.client_ip = d.client_ip
         WHERE l.request_ts >= datetime('now', '-24 hours')
         GROUP BY l.client_ip
-        ORDER BY total_queries DESC
-        LIMIT 8;
+        ORDER BY total_queries DESC;
         """)
         rows = cursor.fetchall()
     finally:

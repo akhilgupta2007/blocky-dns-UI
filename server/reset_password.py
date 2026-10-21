@@ -8,8 +8,8 @@ from auth import hash_password
 
 def reset_password(username: str, new_password: str):
     init_db()
-    if len(new_password) < 6:
-        print("[-] Error: Password must be at least 6 characters.")
+    if len(new_password) < 8:
+        print("[-] Error: Password must be at least 8 characters.")
         sys.exit(1)
 
     conn = get_connection()

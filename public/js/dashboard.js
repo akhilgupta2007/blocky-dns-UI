@@ -31,6 +31,11 @@ async function loadDashboard() {
     if (blockedEl) blockedEl.textContent = summary.blocked_queries_24h.toLocaleString();
     if (pctEl) pctEl.textContent = `${summary.blocked_percent}%`;
     if (devicesEl) devicesEl.textContent = summary.active_devices_count;
+    const devBadge = document.getElementById("devicesNavBadge");
+    if (devBadge) {
+      devBadge.textContent = summary.active_devices_count || 0;
+      devBadge.style.display = summary.active_devices_count > 0 ? "inline-block" : "none";
+    }
     if (rulesEl) rulesEl.textContent = summary.active_rules_count.toLocaleString();
     if (latencyEl) latencyEl.textContent = `${summary.upstream_latency_ms}ms via Encrypted DoH`;
 

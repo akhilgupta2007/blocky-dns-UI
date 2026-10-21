@@ -5,6 +5,8 @@ from database import get_connection
 from auth import get_current_user
 from blocky_client import sync_config_from_db, refresh_lists, flush_cache, schedule_blocky_restart
 
+from resolver_utils import is_safe_public_url
+
 router = APIRouter(prefix="/api/blocklists", tags=["blocklists"], dependencies=[Depends(get_current_user)])
 
 class AddBlocklistRequest(BaseModel):
@@ -118,6 +120,9 @@ async def add_blocklist(req: AddBlocklistRequest, background_tasks: BackgroundTa
     name = req.name.strip()
     if not url.startswith("http://") and not url.startswith("https://"):
         raise HTTPException(status_code=400, detail="Blocklist URL must start with http:// or https://")
+
+    if not is_safe_public_url(url):
+        raise HTTPException(status_code=400, detail="Blocklist URL must be an accessible, public HTTP/HTTPS URL")
 
     conn = get_connection()
     cursor = conn.cursor()

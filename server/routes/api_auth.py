@@ -1,13 +1,40 @@
 from fastapi import APIRouter, HTTPException, Response, Request, Depends
 from pydantic import BaseModel
+import time
+from collections import defaultdict
 from database import get_connection
 from auth import (
     hash_password, verify_password, create_access_token,
-    is_setup_completed, get_current_user
+    is_setup_completed, get_current_user, revoke_token
 )
 from blocky_client import sync_config_from_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+_FAILED_LOGINS = defaultdict(list)
+_MAX_FAILED_ATTEMPTS = 5
+_LOCKOUT_SECONDS = 60
+
+def _get_client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+def _check_login_rate_limit(client_ip: str):
+    now = time.time()
+    attempts = [t for t in _FAILED_LOGINS[client_ip] if now - t < _LOCKOUT_SECONDS]
+    _FAILED_LOGINS[client_ip] = attempts
+    if len(attempts) >= _MAX_FAILED_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Please wait 60 seconds before trying again."
+        )
+
+def _record_failed_login(client_ip: str):
+    _FAILED_LOGINS[client_ip].append(time.time())
+
+def _clear_failed_logins(client_ip: str):
+    _FAILED_LOGINS.pop(client_ip, None)
 
 def _is_request_secure(request: Request) -> bool:
     return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
@@ -54,8 +81,8 @@ def initial_setup(req: SetupRequest, request: Request, response: Response):
     if is_setup_completed():
         raise HTTPException(status_code=400, detail="Setup has already been completed")
 
-    if not req.username or len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if not req.username or len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
     conn = get_connection()
     try:
@@ -96,6 +123,9 @@ def initial_setup(req: SetupRequest, request: Request, response: Response):
 
 @router.post("/login")
 def login(req: LoginRequest, request: Request, response: Response):
+    client_ip = _get_client_ip(request)
+    _check_login_rate_limit(client_ip)
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -103,8 +133,10 @@ def login(req: LoginRequest, request: Request, response: Response):
         user = cursor.fetchone()
 
         if not user or not verify_password(req.password, user["password_hash"]):
+            _record_failed_login(client_ip)
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
+        _clear_failed_logins(client_ip)
         cursor.execute("UPDATE users SET last_login = datetime('now') WHERE id = ?;", (user["id"],))
         conn.commit()
         username = user["username"]
@@ -126,6 +158,15 @@ def login(req: LoginRequest, request: Request, response: Response):
 
 @router.post("/logout")
 def logout(request: Request, response: Response):
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        token = request.cookies.get("blockydns_token")
+    if token:
+        revoke_token(token)
+
     is_secure = _is_request_secure(request)
     response.delete_cookie(key="blockydns_token", path="/", httponly=True, secure=is_secure, samesite="lax")
     return {"success": True}
@@ -136,8 +177,8 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/change-password")
 def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
 
     conn = get_connection()
     try:

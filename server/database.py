@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 try:
-    os.chmod(str(DATA_DIR), 0o777)
+    os.chmod(str(DATA_DIR), 0o750)
 except Exception:
     pass
 DB_PATH = DATA_DIR / "blockydns.db"
@@ -103,7 +103,25 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        last_login TEXT
+        last_login TEXT,
+        token_version INTEGER DEFAULT 1
+    );
+    """)
+
+    # Ensure token_version column exists on existing installations
+    try:
+        cursor.execute("PRAGMA table_info(users);")
+        u_cols = {c["name"] for c in cursor.fetchall()}
+        if "token_version" not in u_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1;")
+    except Exception:
+        pass
+
+    # Revoked tokens table for token invalidation / logout
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS revoked_tokens (
+        token_hash TEXT PRIMARY KEY,
+        revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
