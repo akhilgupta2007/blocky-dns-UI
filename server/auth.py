@@ -3,6 +3,7 @@ import datetime
 import bcrypt
 import jwt
 import secrets
+import uuid
 from fastapi import HTTPException, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import get_connection
@@ -15,7 +16,7 @@ KNOWN_DEFAULT_SECRETS = {
 
 def _get_jwt_secret() -> str:
     env_secret = os.getenv("JWT_SECRET")
-    if env_secret and env_secret.strip() and env_secret.strip() not in KNOWN_DEFAULT_SECRETS:
+    if env_secret and len(env_secret.strip()) >= 32 and env_secret.strip() not in KNOWN_DEFAULT_SECRETS:
         return env_secret.strip()
     try:
         conn = get_connection()
@@ -23,16 +24,16 @@ def _get_jwt_secret() -> str:
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE key = 'jwt_secret';")
             row = cursor.fetchone()
-            if row and row["value"] and row["value"].strip() not in KNOWN_DEFAULT_SECRETS:
+            if row and row["value"] and len(row["value"].strip()) >= 32 and row["value"].strip() not in KNOWN_DEFAULT_SECRETS:
                 return row["value"].strip()
-            generated = secrets.token_urlsafe(32)
+            generated = secrets.token_hex(32)
             cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('jwt_secret', ?);", (generated,))
             conn.commit()
             return generated
         finally:
             conn.close()
     except Exception:
-        return secrets.token_urlsafe(32)
+        return secrets.token_hex(32)
 
 JWT_SECRET = _get_jwt_secret()
 JWT_ALGORITHM = "HS256"
@@ -59,6 +60,7 @@ def get_ua_fingerprint(request: Request) -> str:
 def create_access_token(username: str, request: Request = None) -> str:
     payload = {
         "sub": username,
+        "jti": uuid.uuid4().hex,
         "iat": datetime.datetime.now(datetime.timezone.utc),
         "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=JWT_EXPIRATION_HOURS)
     }

@@ -4,20 +4,64 @@
 
 let cachedTimelineData = null;
 let cachedSummaryData = null;
+let cachedTopDomainsData = null;
+let cachedDashboardDevices = [];
+let dashboardDeviceSortCol = "total_queries";
+let dashboardDeviceSortAsc = false;
 let pauseCountdownInterval = null;
 let pauseSecondsRemaining = 0;
 
+function getDashVolumeRange() {
+  const sel = document.getElementById("dashVolumeRangeSelect");
+  return sel ? sel.value : "retention";
+}
+
+async function onDashVolumeRangeChange() {
+  await loadDashboard();
+}
+
 async function loadDashboard() {
   try {
-    const [summary, timeline, topDomains, topDevices] = await Promise.all([
-      apiRequest("/api/stats/summary"),
-      apiRequest("/api/stats/timeline"),
-      apiRequest("/api/stats/top-domains"),
-      apiRequest("/api/stats/top-devices")
+    const range = getDashVolumeRange();
+    const [summary, timeline, topDomains, topDevices, settings] = await Promise.all([
+      apiRequest(`/api/stats/summary?range=${encodeURIComponent(range)}`),
+      apiRequest(`/api/stats/timeline?range=${encodeURIComponent(range)}`),
+      apiRequest(`/api/stats/top-domains?range=${encodeURIComponent(range)}&limit=10`),
+      apiRequest(`/api/stats/top-devices?range=${encodeURIComponent(range)}`),
+      apiRequest("/api/control/settings").catch(() => null)
     ]);
 
     if (!summary) return;
     cachedSummaryData = summary;
+    if (topDomains) cachedTopDomainsData = topDomains;
+    if (topDevices) cachedDashboardDevices = Array.isArray(topDevices) ? topDevices : [];
+
+    // Format human-friendly label for current window
+    const retentionDays = (settings && settings.log_retention_days) ? parseInt(settings.log_retention_days, 10) : 7;
+    let windowLabel = "Full Retention Window";
+    let windowShort = "Retention Window";
+    if (range === "24h" || range === "1d") {
+      windowLabel = "24-Hour Query Volume";
+      windowShort = "Last 24h";
+    } else if (range === "3d") {
+      windowLabel = "3-Day Query Volume";
+      windowShort = "Last 3 Days";
+    } else {
+      windowLabel = `Query Volume (${retentionDays}d Retention)`;
+      windowShort = `${retentionDays}d Window`;
+    }
+
+    const titleEl = document.getElementById("timelineTitle");
+    if (titleEl) titleEl.textContent = windowLabel;
+
+    const donutPill = document.getElementById("donutRangePill");
+    if (donutPill) donutPill.textContent = windowShort;
+
+    const topBlockedPill = document.getElementById("topBlockedRangePill");
+    if (topBlockedPill) topBlockedPill.textContent = windowShort;
+
+    const devPill = document.getElementById("deviceBreakdownRangePill");
+    if (devPill) devPill.textContent = windowShort;
 
     // Update KPIs
     const totalEl = document.getElementById("kpiTotalQueries");
@@ -51,15 +95,13 @@ async function loadDashboard() {
     // Timeline Area Chart
     if (timeline) drawTimelineChart(timeline);
 
-    // Top Blocked Domains
+    // Top Blocked Domains (up to 10 with scrollbar)
     if (topDomains && topDomains.top_blocked) {
       renderTopBlocked(topDomains.top_blocked);
     }
 
     // Client Device Breakdown
-    if (topDevices) {
-      renderDashboardDevices(topDevices);
-    }
+    sortAndRenderDashboardDevices();
   } catch (err) {
     console.error("Error loading dashboard:", err);
   }
@@ -348,33 +390,113 @@ function drawDonutChart(queryDist, totalQueries, blockedQueries) {
 }
 
 // ----------------------------------------------------------
-// TOP BLOCKED DOMAINS LIST
+// TOP BLOCKED DOMAINS LIST (UP TO TOP 10 WITH SCROLLBAR)
 // ----------------------------------------------------------
 function renderTopBlocked(blockedList) {
   const container = document.getElementById("topBlockedList");
   if (!container) return;
 
-  if (blockedList.length === 0) {
-    container.innerHTML = `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">No blocked queries recorded yet.</div>`;
+  if (!blockedList || blockedList.length === 0) {
+    container.innerHTML = `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px; text-align: center;">No blocked queries recorded in this window.</div>`;
     return;
   }
 
-  const maxCount = Math.max(...blockedList.map(b => b.count), 1);
-  container.innerHTML = blockedList.slice(0, 6).map(b => {
+  const listToShow = blockedList.slice(0, 10);
+  const maxCount = Math.max(...listToShow.map(b => b.count), 1);
+  container.innerHTML = listToShow.map((b, idx) => {
     const pct = Math.round((b.count / maxCount) * 100);
     const safeDomain = escapeHtml(b.domain);
     return `
-      <div data-domain="${safeDomain}" onclick="filterLogsByDomain(this.dataset.domain)" style="cursor: pointer; padding: 4px 0; border-radius: 4px; transition: background 0.15s ease;" title="Click to view queries for ${safeDomain}" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-        <div style="display: flex; justify-content: space-between; font-size: 0.84rem; margin-bottom: 4px;">
-          <span style="font-family: monospace; color: var(--text-main);">${safeDomain}</span>
-          <span style="color: var(--accent-red); font-weight: 600;">${b.count.toLocaleString()}</span>
+      <div data-domain="${safeDomain}" onclick="filterLogsByDomain(this.dataset.domain)" style="cursor: pointer; padding: 6px 8px; border-radius: var(--radius-sm); transition: background 0.15s ease; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);" title="Click to view queries for ${safeDomain}" onmouseover="this.style.background='rgba(239, 68, 68, 0.08)'; this.style.borderColor='rgba(239, 68, 68, 0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.015)'; this.style.borderColor='rgba(255,255,255,0.03)'">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.83rem; margin-bottom: 5px;">
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+            <span style="font-size: 0.72rem; color: var(--text-dim); font-family: monospace; min-width: 18px;">#${idx + 1}</span>
+            <span style="font-family: monospace; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeDomain}</span>
+          </div>
+          <span style="color: var(--accent-red); font-weight: 700; font-family: monospace;">${b.count.toLocaleString()}</span>
         </div>
-        <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: var(--radius-full); overflow: hidden;">
+        <div style="height: 5px; background: rgba(255,255,255,0.05); border-radius: var(--radius-full); overflow: hidden;">
           <div style="height: 100%; width: ${pct}%; background: linear-gradient(90deg, var(--accent-red), #dc2626); border-radius: var(--radius-full);"></div>
         </div>
       </div>
     `;
   }).join("");
+}
+
+// ----------------------------------------------------------
+// CLIENT DEVICE ACTIVITY BREAKDOWN SORTING & RENDERING
+// ----------------------------------------------------------
+function sortDashboardDevices(col) {
+  if (dashboardDeviceSortCol === col) {
+    dashboardDeviceSortAsc = !dashboardDeviceSortAsc;
+  } else {
+    dashboardDeviceSortCol = col;
+    // Default descending for numeric metrics; ascending for names/IP
+    dashboardDeviceSortAsc = (col === "name" || col === "client_ip");
+  }
+  sortAndRenderDashboardDevices();
+}
+
+function updateDashSortHeaders() {
+  const mapping = {
+    name: "sortDashDevName",
+    client_ip: "sortDashDevIp",
+    total_queries: "sortDashDevTotal",
+    blocked_queries: "sortDashDevBlocked",
+    blocked_percent: "sortDashDevPct"
+  };
+
+  Object.entries(mapping).forEach(([key, elementId]) => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const parentTh = el.closest("th");
+    if (key === dashboardDeviceSortCol) {
+      el.textContent = dashboardDeviceSortAsc ? "▲" : "▼";
+      if (parentTh) parentTh.classList.add("active");
+    } else {
+      el.textContent = "↕";
+      if (parentTh) parentTh.classList.remove("active");
+    }
+  });
+}
+
+function sortAndRenderDashboardDevices() {
+  if (!cachedDashboardDevices || !Array.isArray(cachedDashboardDevices)) {
+    renderDashboardDevices([]);
+    return;
+  }
+
+  const devices = [...cachedDashboardDevices];
+
+  function ipToNum(ip) {
+    if (!ip) return 0;
+    const parts = ip.split(".");
+    if (parts.length === 4) {
+      return parts.reduce((acc, octet) => (acc << 8) + parseInt(octet || "0", 10), 0) >>> 0;
+    }
+    return 0;
+  }
+
+  devices.sort((a, b) => {
+    let res = 0;
+    if (dashboardDeviceSortCol === "client_ip") {
+      res = ipToNum(a.client_ip) - ipToNum(b.client_ip);
+    } else if (dashboardDeviceSortCol === "total_queries") {
+      res = (a.total_queries || 0) - (b.total_queries || 0);
+    } else if (dashboardDeviceSortCol === "blocked_queries") {
+      res = (a.blocked_queries || 0) - (b.blocked_queries || 0);
+    } else if (dashboardDeviceSortCol === "blocked_percent") {
+      res = (a.blocked_percent || 0) - (b.blocked_percent || 0);
+    } else if (dashboardDeviceSortCol === "name") {
+      const nA = (a.name || a.friendly_name || a.hostname || a.client_ip || "").toLowerCase();
+      const nB = (b.name || b.friendly_name || b.hostname || b.client_ip || "").toLowerCase();
+      res = nA.localeCompare(nB);
+    }
+    return dashboardDeviceSortAsc ? res : -res;
+  });
+
+  updateDashSortHeaders();
+  renderDashboardDevices(devices);
 }
 
 // ----------------------------------------------------------
@@ -385,7 +507,7 @@ function renderDashboardDevices(devices) {
   if (!tbody) return;
 
   if (devices.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">No active devices discovered yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">No active devices discovered in this window.</td></tr>`;
     return;
   }
 
@@ -568,6 +690,9 @@ window.addEventListener("resize", () => {
 
 // Window scope exports
 window.loadDashboard = loadDashboard;
+window.onDashVolumeRangeChange = onDashVolumeRangeChange;
+window.sortDashboardDevices = sortDashboardDevices;
+window.sortAndRenderDashboardDevices = sortAndRenderDashboardDevices;
 window.handlePauseBlocking = handlePauseBlocking;
 window.handleResumeBlocking = handleResumeBlocking;
 window.drawTimelineChart = drawTimelineChart;

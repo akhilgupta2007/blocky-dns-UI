@@ -319,6 +319,24 @@ async def get_whois_info(domain: str):
     if clean_domain.startswith("*."):
         clean_domain = clean_domain[2:]
     clean_domain = clean_domain.rstrip(".")
+
+    # Defensive validation: reject or return clean fallback on control chars, null bytes, or excessive length
+    if not clean_domain or len(clean_domain) > 253 or any(ord(c) < 33 or ord(c) > 126 for c in clean_domain):
+        return {
+            "domain": clean_domain[:64],
+            "apex_domain": "",
+            "registrar": "Invalid domain format",
+            "creation_date": "Unknown",
+            "expiration_date": "Unknown",
+            "nameservers": [],
+            "status": ["INVALID_INPUT"],
+            "resolved_ips": [],
+            "whois_url": "",
+            "virustotal_url": "",
+            "whotracksme_url": "",
+            "whotracksme_search_url": ""
+        }
+
     apex_domain = extract_apex_domain(clean_domain)
 
     # 1. Resolve active IP addresses

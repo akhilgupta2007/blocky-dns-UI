@@ -94,14 +94,31 @@ class TestBlockyDnsHub(unittest.TestCase):
         self.assertGreater(data["active_rules_count"], 0)
         print(f"[OK] Stats Summary: {data['total_queries_24h']} queries, {data['blocked_queries_24h']} blocked ({data['blocked_percent']}%)")
 
-        # Timeline
+        # Timeline (default & custom retention windows)
         timeline_res = self.client.get("/api/stats/timeline", headers=TestBlockyDnsHub.headers)
         self.assertEqual(timeline_res.status_code, 200)
         self.assertIsInstance(timeline_res.json(), list)
         print(f"[OK] 24h Timeline buckets verified: {len(timeline_res.json())} hours")
 
-        # Top devices
-        devices_res = self.client.get("/api/stats/top-devices", headers=TestBlockyDnsHub.headers)
+        timeline_3d = self.client.get("/api/stats/timeline?range=3d", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(timeline_3d.status_code, 200)
+        self.assertIsInstance(timeline_3d.json(), list)
+
+        timeline_ret = self.client.get("/api/stats/timeline?range=retention", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(timeline_ret.status_code, 200)
+        self.assertIsInstance(timeline_ret.json(), list)
+
+        # Top domains (up to 10 with limit param)
+        top_domains_res = self.client.get("/api/stats/top-domains?limit=10&range=retention", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(top_domains_res.status_code, 200)
+        td_data = top_domains_res.json()
+        self.assertIn("top_blocked", td_data)
+        self.assertIn("top_allowed", td_data)
+        self.assertLessEqual(len(td_data["top_blocked"]), 10)
+        print(f"[OK] Top blocked domains retention window verified (limit 10): {len(td_data['top_blocked'])} domains")
+
+        # Top devices (range window supported)
+        devices_res = self.client.get("/api/stats/top-devices?range=retention", headers=TestBlockyDnsHub.headers)
         self.assertEqual(devices_res.status_code, 200)
         top_devs = devices_res.json()
         self.assertGreater(len(top_devs), 0)

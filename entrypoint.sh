@@ -5,7 +5,7 @@ set -e
 umask 0022
 
 echo "=================================================="
-echo "          BlockyDNS Hub v1.2.0 (Docker)"
+echo "          BlockyDNS Hub v1.3.0 (Docker)"
 echo "=================================================="
 
 # Ensure target volume directories exist inside the container

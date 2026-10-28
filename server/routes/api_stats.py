@@ -1,5 +1,6 @@
 import time
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 from database import get_connection, get_log_entries_columns
 from auth import get_current_user
 from blocky_client import check_blocky_status
@@ -19,9 +20,78 @@ def _get_cached_stat(key: str):
 def _set_cached_stat(key: str, val):
     _STATS_CACHE[key] = (val, time.time())
 
+def _resolve_range_modifier(range_param: Optional[str] = None) -> tuple[str, str, int]:
+    """
+    Resolves range_param into:
+      (sql_modifier, bucket_format, bucket_type: 0 for hour 'MM-DD HH:00' / 'HH:00', 1 for day 'YYYY-MM-DD')
+    If range_param is None, 'retention', 'max', or 'all', it resolves to the configured log_retention_days in settings.
+    Supported range formats: '24h', '1d', '3d', '7d', '14d', '30d', or integer days / 'retention'.
+    Guards defensively against fuzzing, extreme values, and SQL injection strings.
+    """
+    days = None
+    hours = None
+
+    if range_param:
+        rp = str(range_param).strip().lower()
+        # Truncate any overly long fuzz inputs
+        if len(rp) > 32:
+            rp = rp[:32]
+        if rp in ("retention", "max", "all"):
+            pass
+        elif rp.endswith("h"):
+            try:
+                val = int(rp[:-1])
+                # Bound hours between 1 and 87600 (10 years)
+                hours = max(1, min(val, 87600))
+            except (ValueError, OverflowError):
+                pass
+        elif rp.endswith("d"):
+            try:
+                val = int(rp[:-1])
+                # Bound days between 1 and 3650 (10 years)
+                days = max(1, min(val, 3650))
+            except (ValueError, OverflowError):
+                pass
+        else:
+            try:
+                val = int(rp)
+                days = max(1, min(val, 3650))
+            except (ValueError, OverflowError):
+                pass
+
+    if days is None and hours is None:
+        conn = get_connection()
+        try:
+            c = conn.cursor()
+            c.execute("SELECT value FROM settings WHERE key = 'log_retention_days';")
+            r = c.fetchone()
+            days = int(r["value"]) if r and r["value"] and r["value"].isdigit() else 7
+        except Exception:
+            days = 7
+        finally:
+            conn.close()
+
+    if hours is not None:
+        hours = max(1, min(int(hours), 87600))
+        sql_modifier = f"-{hours} hours"
+        bucket_format = "%H:00" if hours <= 24 else "%m-%d %H:00"
+        return sql_modifier, bucket_format, 0
+
+    if days is None or days <= 0:
+        days = 1
+    days = min(int(days), 3650)
+    if days == 1:
+        return "-24 hours", "%H:00", 0
+    elif days <= 3:
+        return f"-{days} days", "%m-%d %H:00", 0
+    else:
+        # Multi-day bucket by date
+        return f"-{days} days", "%Y-%m-%d", 1
+
 @router.get("/summary")
-async def get_summary():
-    cached = _get_cached_stat("summary")
+async def get_summary(range: Optional[str] = Query(None, description="Time range (e.g. 24h, 3d, 7d, retention)")):
+    cache_key = f"summary_{range or 'retention'}"
+    cached = _get_cached_stat(cache_key)
     if cached is not None:
         blocky_stat = await check_blocky_status()
         res = dict(cached)
@@ -29,18 +99,20 @@ async def get_summary():
         res["blocking_enabled"] = blocky_stat.get("blocking_enabled", True)
         return res
 
+    sql_modifier, _, _ = _resolve_range_modifier(range)
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
 
-        # Queries in last 24 hours
-        cursor.execute("""
+        # Queries in specified range
+        cursor.execute(f"""
         SELECT 
             COUNT(*) as total_queries,
             SUM(CASE WHEN response_type = 'BLOCKED' THEN 1 ELSE 0 END) as blocked_queries,
             COUNT(DISTINCT client_ip) as active_clients
         FROM log_entries
-        WHERE request_ts >= datetime('now', '-24 hours');
+        WHERE request_ts >= datetime('now', '{sql_modifier}');
         """)
         row = cursor.fetchone()
         total_q = (row["total_queries"] if row else 0) or 0
@@ -58,13 +130,13 @@ async def get_summary():
         lat_row = cursor.fetchone()
         avg_latency = round(lat_row["avg_lat"], 1) if lat_row and lat_row["avg_lat"] else 12.4
 
-        # Query distribution by response type (RESOLVED, BLOCKED, CACHED, etc.) in last 24h
-        cursor.execute("""
+        # Query distribution by response type in specified range
+        cursor.execute(f"""
         SELECT 
             response_type,
             COUNT(*) as count
         FROM log_entries
-        WHERE request_ts >= datetime('now', '-24 hours')
+        WHERE request_ts >= datetime('now', '{sql_modifier}')
         GROUP BY response_type;
         """)
         dist_rows = cursor.fetchall()
@@ -84,28 +156,32 @@ async def get_summary():
         "upstream_latency_ms": avg_latency,
         "blocky_online": blocky_stat.get("online", True),
         "blocking_enabled": blocky_stat.get("blocking_enabled", True),
-        "query_distribution": query_distribution
+        "query_distribution": query_distribution,
+        "range_modifier": sql_modifier
     }
-    _set_cached_stat("summary", result)
+    _set_cached_stat(cache_key, result)
     return result
 
 @router.get("/timeline")
-def get_timeline():
-    cached = _get_cached_stat("timeline")
+def get_timeline(range: Optional[str] = Query(None, description="Time range (e.g. 24h, 3d, 7d, retention)")):
+    cache_key = f"timeline_{range or 'retention'}"
+    cached = _get_cached_stat(cache_key)
     if cached is not None:
         return cached
+
+    sql_modifier, bucket_format, _ = _resolve_range_modifier(range)
 
     conn = get_connection()
     try:
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(f"""
         SELECT 
-            strftime('%H:00', request_ts) as hour_bucket,
+            strftime('{bucket_format}', request_ts) as hour_bucket,
             COUNT(*) as total,
             SUM(CASE WHEN response_type = 'BLOCKED' THEN 1 ELSE 0 END) as blocked
         FROM log_entries
-        WHERE request_ts >= datetime('now', '-24 hours')
+        WHERE request_ts >= datetime('now', '{sql_modifier}')
         GROUP BY hour_bucket
         ORDER BY hour_bucket ASC;
         """)
@@ -117,12 +193,16 @@ def get_timeline():
         {"hour": r["hour_bucket"], "total": r["total"], "blocked": r["blocked"]}
         for r in rows
     ]
-    _set_cached_stat("timeline", timeline_data)
+    _set_cached_stat(cache_key, timeline_data)
     return timeline_data
 
 @router.get("/top-domains")
-def get_top_domains():
-    cached = _get_cached_stat("top_domains")
+def get_top_domains(
+    range: Optional[str] = Query(None, description="Time range (e.g. 24h, 3d, 7d, retention)"),
+    limit: int = Query(10, ge=1, le=100)
+):
+    cache_key = f"top_domains_{range or 'retention'}_{limit}"
+    cached = _get_cached_stat(cache_key)
     if cached is not None:
         return cached
 
@@ -136,58 +216,65 @@ def get_top_domains():
     else:
         q_expr = f"COALESCE({q_col}, '')"
 
+    sql_modifier, _, _ = _resolve_range_modifier(range)
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
 
-        # Top 10 allowed
+        # Top allowed
         cursor.execute(f"""
         SELECT {q_expr} as domain, COUNT(*) as count
         FROM log_entries
-        WHERE response_type != 'BLOCKED' AND request_ts >= datetime('now', '-24 hours')
+        WHERE response_type != 'BLOCKED' AND request_ts >= datetime('now', '{sql_modifier}')
         GROUP BY domain
         ORDER BY count DESC
-        LIMIT 10;
+        LIMIT {int(limit)};
         """)
         allowed = [dict(r) for r in cursor.fetchall() if r["domain"]]
 
-        # Top 10 blocked
+        # Top blocked
         cursor.execute(f"""
         SELECT {q_expr} as domain, COUNT(*) as count
         FROM log_entries
-        WHERE response_type = 'BLOCKED' AND request_ts >= datetime('now', '-24 hours')
+        WHERE response_type = 'BLOCKED' AND request_ts >= datetime('now', '{sql_modifier}')
         GROUP BY domain
         ORDER BY count DESC
-        LIMIT 10;
+        LIMIT {int(limit)};
         """)
         blocked = [dict(r) for r in cursor.fetchall() if r["domain"]]
     finally:
         conn.close()
 
     result = {"top_allowed": allowed, "top_blocked": blocked}
-    _set_cached_stat("top_domains", result)
+    _set_cached_stat(cache_key, result)
     return result
 
 @router.get("/top-devices")
-def get_top_devices():
-    cached = _get_cached_stat("top_devices")
+def get_top_devices(range: Optional[str] = Query(None, description="Time range (e.g. 24h, 3d, 7d, retention)")):
+    cache_key = f"top_devices_{range or 'retention'}"
+    cached = _get_cached_stat(cache_key)
     if cached is not None:
         return cached
+
+    sql_modifier, _, _ = _resolve_range_modifier(range)
 
     conn = get_connection()
     try:
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(f"""
         SELECT 
             l.client_ip,
             COALESCE(d.friendly_name, d.hostname, l.client_ip) as name,
+            COALESCE(d.hostname, '') as hostname,
+            COALESCE(d.friendly_name, '') as friendly_name,
             COALESCE(d.icon, 'device') as icon,
             COUNT(*) as total_queries,
             SUM(CASE WHEN l.response_type = 'BLOCKED' THEN 1 ELSE 0 END) as blocked_queries
         FROM log_entries l
         LEFT JOIN devices d ON l.client_ip = d.client_ip
-        WHERE l.request_ts >= datetime('now', '-24 hours')
+        WHERE l.request_ts >= datetime('now', '{sql_modifier}')
         GROUP BY l.client_ip
         ORDER BY total_queries DESC;
         """)
@@ -203,12 +290,15 @@ def get_top_devices():
         devices.append({
             "client_ip": r["client_ip"],
             "name": r["name"],
+            "hostname": r["hostname"],
+            "friendly_name": r["friendly_name"],
             "icon": r["icon"],
             "total_queries": tot,
             "blocked_queries": blk,
             "blocked_percent": pct
         })
 
-    _set_cached_stat("top_devices", devices)
+    _set_cached_stat(cache_key, devices)
     return devices
+
 

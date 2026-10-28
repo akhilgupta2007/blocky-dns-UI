@@ -8,7 +8,7 @@
 [![DNS Engine](https://img.shields.io/badge/DNS%20Engine-Blocky%20(Go)-00ADD8?logo=go)](https://github.com/0xERR0R/blocky)
 [![Security](https://img.shields.io/badge/Security-TLS%201.3%20%2B%20Strict%20DoH%2FDoT-00f5d4)](#-security--anti-sniffing-shield)
 [![RAM Footprint](https://img.shields.io/badge/Total%20RAM-%7E118%20MB-purple)](#-performance-benchmarks-raspberry-pi-1gb-ram)
-[![Release](https://img.shields.io/badge/Release-v1.2.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
+[![Release](https://img.shields.io/badge/Release-v1.3.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -412,7 +412,33 @@ docker compose up -d --build
 
 ## 📋 Changelog & Version History
 
-### [v1.1.2] - 2026-09-28
+### [v1.3.0] - 2026-10-28
+
+#### 📈 Multi-Window Telemetry & Full Log Retention Alignment
+* **Retention-Aware Query Volume Window Selector**: Added an interactive window dropdown selector on the Dashboard Query Volume graph (`Last 24 Hours`, `Last 3 Days`, and `Full Retention Window`). Queries dynamically resolve against the configured `log_retention_days` in SQLite settings.
+* **Smart Bucket Aggregation**: The timeline analytics engine automatically selects human-readable intervals based on the active timeframe (`%H:00` for 24h, `%m-%d %H:00` for 3 days, and daily `%Y-%m-%d` buckets for full retention periods up to 90 days).
+* **Synchronized Dashboard Telemetry**: Updated `/api/stats/summary`, `/api/stats/timeline`, `/api/stats/top-domains`, and `/api/stats/top-devices` to accept `?range=` parameters. Query distribution donut breakdowns and telemetry badges now reflect the selected retention window.
+
+#### 🛡️ Top 10 Blocked Websites & Sleek Custom Scrollbars
+* **Top 10 Blocked Websites Container**: Expanded the top blocked domain list from 6 to 10 ranked domains with individual domain rank counters (`#1` through `#10`) and percentage fill meters.
+* **Custom Scrollbar Styling**: Encapsulated the list in a clean `max-height: 380px` scroll view styled with the custom `.custom-scrollbar` utility (thin track, subtle thumb styling, and neon cyan hover effect).
+
+#### 📊 Sortable Client Device Activity Breakdown
+* **Multi-Column Dashboard Sorting**: Added interactive sorting across all column headers in the Client Device Activity Breakdown table:
+  * **Device / Hostname**: Case-insensitive alphabetical sorting.
+  * **IP Address**: True 32-bit numerical IPv4 octet ordering (`192.168.1.2` < `192.168.1.10`).
+  * **Total Queries**: Numeric descending/ascending sort.
+  * **Blocked Queries**: Numeric descending/ascending sort.
+  * **Blocked %**: Blocked percentage rate sort.
+* **Persistent Visual Sort Indicators**: Clean active header badges and sort indicators (`▲`, `▼`, `↕`).
+
+#### 🔒 Adversarial Penetration Hardening & Monkey Fuzzing
+* **Defensive Range Parser Hardening**: Sanitized `_resolve_range_modifier()` against extreme overflows (`1e20`, `Infinity`, `NaN`), negative boundaries (`-0`, `-1`), and SQL injection metacharacters. All integer conversions are bounded between 1 and 3650 days.
+* **Monkey Fuzzing Test Suite**: Added Category 3.1 monkey testing in `test_pentest_and_monkey.py` asserting zero unhandled server crashes across extreme payload boundaries.
+
+---
+
+### [v1.2.0] - 2026-10-17
 
 #### ⚡ Massive Performance & Low-Power Host Optimization
 * **In-Memory Stats TTL Caching**: Added a thread-safe 4-second TTL cache for high-frequency dashboard analytics (`/api/stats/summary`, `/api/stats/timeline`, `/api/stats/top-domains`, `/api/stats/top-devices`). Slashes CPU consumption on low-power devices (Raspberry Pi/DietPi) by **98.5%** (down from 25.14% to 0.38%) and cuts RAM by **40%** (112.7 MiB down to 67.7 MiB).
@@ -430,7 +456,7 @@ docker compose up -d --build
 
 ---
 
-### [v1.2.0] - 2026-10-17
+### [v1.1.2] - 2026-09-28
 
 #### 🔒 Security Vulnerability Audit & Defense-in-Depth Hardening
 * **Docker Socket Mount Elimination**: Removed `/var/run/docker.sock` mount from the management container in `docker-compose.yml` and `docker-compose.ghcr.yml`, completely closing root host privilege escalation risks.
