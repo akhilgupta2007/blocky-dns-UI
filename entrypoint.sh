@@ -14,6 +14,12 @@ mkdir -p /app/data /app/certs /app/config
 # Self-heal permissions on mounted host volumes safely
 chmod 755 /app/data /app/certs /app/config 2>/dev/null || true
 
+# Self-heal stale empty lock/shm files if leftover from abrupt shutdown
+if [ -f "/app/data/blockydns.db-shm" ] && [ ! -s "/app/data/blockydns.db-shm" ]; then
+  echo "[Entrypoint] Removing zero-byte stale SQLite SHM lock index..."
+  rm -f /app/data/blockydns.db-shm 2>/dev/null || true
+fi
+
 # If config.yml does not exist, initialize it from config.example.yml
 if [ ! -f "/app/config/config.yml" ]; then
   if [ -f "/app/config/config.example.yml" ]; then

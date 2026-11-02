@@ -54,10 +54,10 @@ def ensure_db_permissions():
 def get_connection():
     conn = None
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=20.0, check_same_thread=False)
+        conn = sqlite3.connect(str(DB_PATH), timeout=30.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        # Enable WAL mode and performance pragmas for low-resource hardware like Pi 2
-        conn.execute("PRAGMA journal_mode = WAL;")
+        # Set busy timeout so concurrent writes from Blocky wait and retry cleanly
+        conn.execute("PRAGMA busy_timeout = 30000;")
         conn.execute("PRAGMA synchronous = NORMAL;")
         conn.execute("PRAGMA cache_size = 2000;")
         conn.execute("PRAGMA foreign_keys = ON;")
@@ -66,9 +66,9 @@ def get_connection():
         err_msg = str(e).lower()
         if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
             recover_corrupt_database(conn)
-            conn = sqlite3.connect(str(DB_PATH), timeout=20.0, check_same_thread=False)
+            conn = sqlite3.connect(str(DB_PATH), timeout=30.0, check_same_thread=False)
             conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA busy_timeout = 30000;")
             conn.execute("PRAGMA synchronous = NORMAL;")
             conn.execute("PRAGMA cache_size = 2000;")
             conn.execute("PRAGMA foreign_keys = ON;")
@@ -80,19 +80,34 @@ def init_db():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("PRAGMA integrity_check(1);")
+
+        # Ensure WAL mode is active
+        try:
+            conn.execute("PRAGMA journal_mode = WAL;")
+        except Exception as e:
+            print(f"[DB] Journal mode note: {e}")
+
+        # Fast non-blocking quick check
+        print("[DB] Verifying database integrity (quick_check)...")
+        cursor.execute("PRAGMA quick_check(1);")
         row = cursor.fetchone()
         if row and str(row[0]).lower() != "ok":
+            print(f"[DB ALERT] Quick check detected issue: {row[0]}. Recovering database...")
             conn.close()
             recover_corrupt_database()
             conn = get_connection()
             cursor = conn.cursor()
+            conn.execute("PRAGMA journal_mode = WAL;")
+        else:
+            print("[DB] Database integrity OK.")
     except sqlite3.DatabaseError as err:
         err_msg = str(err).lower()
         if any(w in err_msg for w in ["malformed", "file is not a database", "corrupt"]):
+            print(f"[DB ALERT] Corrupt database encountered ({err}). Auto-recovering clean database...")
             recover_corrupt_database()
             conn = get_connection()
             cursor = conn.cursor()
+            conn.execute("PRAGMA journal_mode = WAL;")
         else:
             raise
 
@@ -225,30 +240,50 @@ def init_db():
     );
     """)
 
-    # Check and migrate existing log_entries if created under old schema
+    # 9. Key-Value Settings table (created early for migration tracking)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """)
+
+    # Check and migrate existing log_entries if created under old schema (guarded against repeat scans on reboot)
     try:
-        cursor.execute("PRAGMA table_info(log_entries);")
-        existing_cols = {c["name"]: dict(c) for c in cursor.fetchall()}
-        
-        for col_name, col_type in [
-            ("question_name", "TEXT"),
-            ("question_type", "TEXT"),
-            ("response_code", "TEXT"),
-            ("effective_tldp", "TEXT"),
-            ("hostname", "TEXT"),
-            ("question", "TEXT")
-        ]:
-            if col_name not in existing_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE log_entries ADD COLUMN {col_name} {col_type} DEFAULT '';")
-                except Exception:
-                    pass
-        # Synchronize question and question_name so both are always populated
-        try:
-            cursor.execute("UPDATE log_entries SET question = question_name WHERE (question = '' OR question IS NULL) AND question_name IS NOT NULL AND question_name != '';")
-            cursor.execute("UPDATE log_entries SET question_name = question WHERE (question_name = '' OR question_name IS NULL) AND question IS NOT NULL AND question != '';")
-        except Exception:
-            pass
+        cursor.execute("SELECT value FROM settings WHERE key = 'migration_v130_columns_synced';")
+        migrated_row = cursor.fetchone()
+        if not migrated_row or migrated_row["value"] != "true":
+            cursor.execute("PRAGMA table_info(log_entries);")
+            existing_cols = {c["name"]: dict(c) for c in cursor.fetchall()}
+            
+            for col_name, col_type in [
+                ("question_name", "TEXT"),
+                ("question_type", "TEXT"),
+                ("response_code", "TEXT"),
+                ("effective_tldp", "TEXT"),
+                ("hostname", "TEXT"),
+                ("question", "TEXT")
+            ]:
+                if col_name not in existing_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE log_entries ADD COLUMN {col_name} {col_type} DEFAULT '';")
+                    except Exception:
+                        pass
+            # Synchronize question and question_name on recent entries without holding full table lock
+            try:
+                cursor.execute("""
+                UPDATE log_entries SET question = question_name 
+                WHERE (question = '' OR question IS NULL) AND question_name IS NOT NULL AND question_name != ''
+                AND id IN (SELECT id FROM log_entries ORDER BY id DESC LIMIT 5000);
+                """)
+                cursor.execute("""
+                UPDATE log_entries SET question_name = question 
+                WHERE (question_name = '' OR question_name IS NULL) AND question IS NOT NULL AND question != ''
+                AND id IN (SELECT id FROM log_entries ORDER BY id DESC LIMIT 5000);
+                """)
+            except Exception:
+                pass
+            cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('migration_v130_columns_synced', 'true');")
     except Exception as err:
         print(f"[DB] Migration note: {err}")
 
@@ -260,14 +295,6 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_question ON log_entries(question);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_type ON log_entries(request_ts, response_type);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_ip ON log_entries(request_ts, client_ip);")
-
-    # 9. Key-Value Settings table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-    );
-    """)
 
     # 10. Blocked Services table (1-Click App/Platform blocking catalog)
     cursor.execute("""
@@ -296,7 +323,7 @@ def init_db():
     except Exception:
         pass
 
-    print(f"[DB] SQLite database initialized at {DB_PATH}")
+    print(f"[DB] SQLite database initialized successfully at {DB_PATH}")
 
 _cached_columns = set()
 
