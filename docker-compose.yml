@@ -19,6 +19,9 @@ services:
       - ./data:/app/config/dynamic
     networks:
       - blocky-net
+    depends_on:
+      hub:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4000/api/blocking/status || exit 1"]
       interval: 30s
@@ -48,9 +51,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./certs:/app/certs
-    depends_on:
-      blocky:
-        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -k -f https://127.0.0.1:3443/api/auth/status || exit 1"]
       interval: 30s
