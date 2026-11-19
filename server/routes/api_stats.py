@@ -8,7 +8,11 @@ from blocky_client import check_blocky_status
 router = APIRouter(prefix="/api/stats", tags=["stats"], dependencies=[Depends(get_current_user)])
 
 _STATS_CACHE = {}
-_STATS_TTL_SECONDS = 4.0  # 4-second TTL coalesces concurrent dashboard requests and multiple browser tabs
+_STATS_TTL_SECONDS = 30.0  # 30-second TTL avoids repeated multi-hundred-thousand row SQLite table scans
+
+def clear_stats_cache():
+    """Explicitly clears the stats cache when data changes or rules update."""
+    _STATS_CACHE.clear()
 
 def _get_cached_stat(key: str):
     if key in _STATS_CACHE:

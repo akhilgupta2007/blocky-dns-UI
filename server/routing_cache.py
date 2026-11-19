@@ -30,6 +30,22 @@ def reload_routing_cache() -> list[dict]:
                     "resolver": r["resolver"] or "",
                     "tag": r["tag"] or ""
                 })
+
+        # Also load active DNSSEC bypass rules for query enrichment
+        cursor.execute("SELECT domain, enabled FROM custom_rules WHERE rule_type = 'dnssec_bypass';")
+        for r in cursor.fetchall():
+            is_enabled = r["enabled"] in (1, "1", True, "true", "True") or r["enabled"] is None
+            if not is_enabled:
+                continue
+            pat = (r["domain"] or "").strip().lower()
+            clean_pat = pat[2:] if pat.startswith("*.") else (pat[1:] if pat.startswith(".") else pat)
+            clean_pat = clean_pat.rstrip(".")
+            if clean_pat:
+                rules.append({
+                    "pattern": clean_pat,
+                    "resolver": "DNSSEC Bypass",
+                    "tag": "DNSSEC Bypass"
+                })
         conn.close()
         with _cache_lock:
             _routing_cache = rules

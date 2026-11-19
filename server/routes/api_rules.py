@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from database import get_connection
 from auth import get_current_user
-from blocky_client import sync_config_from_db, refresh_lists, flush_cache
+from blocky_client import sync_config_from_db, refresh_lists, flush_cache, schedule_blocky_restart
+from routing_cache import reload_routing_cache
 
 router = APIRouter(prefix="/api/rules", tags=["rules"], dependencies=[Depends(get_current_user)])
 
 class AddRuleRequest(BaseModel):
-    rule_type: str # 'whitelist' or 'blacklist'
+    rule_type: str # 'whitelist', 'blacklist', or 'dnssec_bypass'
     domain: str
     comment: str = ""
 
@@ -69,8 +70,8 @@ async def add_rule(req: AddRuleRequest):
     if not domain:
         raise HTTPException(status_code=400, detail="Domain cannot be empty")
 
-    if rule_type not in ["whitelist", "blacklist"]:
-        raise HTTPException(status_code=400, detail="Rule type must be whitelist or blacklist")
+    if rule_type not in ["whitelist", "blacklist", "dnssec_bypass"]:
+        raise HTTPException(status_code=400, detail="Rule type must be whitelist, blacklist, or dnssec_bypass")
 
     is_wildcard = 1 if domain.startswith("*.") else 0
     is_regex = 1 if (domain.startswith("/") and domain.endswith("/")) else 0
@@ -92,6 +93,9 @@ async def add_rule(req: AddRuleRequest):
         conn.close()
 
     sync_config_from_db()
+    if rule_type == "dnssec_bypass":
+        schedule_blocky_restart()
+        reload_routing_cache()
     await refresh_lists()
     await flush_cache()
     return {"success": True, "domain": domain, "rule_type": rule_type}
@@ -101,6 +105,7 @@ async def import_rules(req: ImportRulesRequest):
     lines = req.rules_text.splitlines()
     count_w = 0
     count_b = 0
+    count_d = 0
     skipped = 0
 
     conn = get_connection()
@@ -130,8 +135,10 @@ async def import_rules(req: ImportRulesRequest):
                     to_enable_ids.append((rule_id,))
                     if r_type == "whitelist":
                         count_w += 1
-                    else:
+                    elif r_type == "blacklist":
                         count_b += 1
+                    else:
+                        count_d += 1
                 else:
                     skipped += 1
             else:
@@ -140,8 +147,10 @@ async def import_rules(req: ImportRulesRequest):
                 to_insert.append((r_type, domain, is_wildcard, is_regex))
                 if r_type == "whitelist":
                     count_w += 1
-                else:
+                elif r_type == "blacklist":
                     count_b += 1
+                else:
+                    count_d += 1
 
         if to_enable_ids:
             cursor.executemany("UPDATE custom_rules SET enabled = 1 WHERE id = ?;", to_enable_ids)
@@ -156,8 +165,11 @@ async def import_rules(req: ImportRulesRequest):
     finally:
         conn.close()
 
-    if count_w > 0 or count_b > 0:
+    if count_w > 0 or count_b > 0 or count_d > 0:
         sync_config_from_db()
+        if count_d > 0:
+            schedule_blocky_restart()
+            reload_routing_cache()
         await refresh_lists()
         await flush_cache()
 
@@ -165,7 +177,8 @@ async def import_rules(req: ImportRulesRequest):
         "success": True,
         "added_whitelist": count_w,
         "added_blacklist": count_b,
-        "total_added": count_w + count_b,
+        "added_dnssec_bypass": count_d,
+        "total_added": count_w + count_b + count_d,
         "skipped": skipped
     }
 
@@ -184,6 +197,8 @@ async def delete_rule(target: str):
         conn.close()
 
     sync_config_from_db()
+    schedule_blocky_restart()
+    reload_routing_cache()
     await refresh_lists()
     await flush_cache()
     return {"success": True}

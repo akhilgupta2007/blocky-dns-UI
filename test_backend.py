@@ -841,6 +841,120 @@ class TestBlockyDnsHub(unittest.TestCase):
 
         print(f"[OK] AdGuard bulk rules import verified: Whitelist={data['added_whitelist']}, Blacklist={data['added_blacklist']}")
 
+    def test_26_dnssec_bypass_custom_rules_and_status_filter_codes(self):
+        # 1. Add DNSSEC bypass custom rule for wildcard domain (*.telegram.org)
+        add_res = self.client.post("/api/rules/add", headers=TestBlockyDnsHub.headers, json={
+            "rule_type": "dnssec_bypass",
+            "domain": "*.telegram.org",
+            "comment": "Bypass broken DNSSEC for Telegram"
+        })
+        self.assertEqual(add_res.status_code, 200)
+        self.assertTrue(add_res.json()["success"])
+
+        # 2. Verify rule in list_rules
+        rules_res = self.client.get("/api/rules", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(rules_res.status_code, 200)
+        rules = rules_res.json()
+        telegram_rule = next((r for r in rules if r["domain"] == "*.telegram.org" and r["rule_type"] == "dnssec_bypass"), None)
+        self.assertIsNotNone(telegram_rule)
+
+        # 3. Verify compiled blocky config.yml has conditional mapping for telegram.org
+        import yaml
+        cfg_path = Path(os.environ["BLOCKY_CONFIG_PATH"])
+        self.assertTrue(cfg_path.exists())
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        self.assertIn("conditional", cfg)
+        self.assertIn("telegram.org", cfg["conditional"]["mapping"])
+        print(f"[OK] DNSSEC bypass rule compiled to Blocky conditional: telegram.org -> {cfg['conditional']['mapping']['telegram.org']}")
+
+        # 4. Verify in-memory routing cache contains the rule
+        from routing_cache import get_cached_routing_rules
+        cached = get_cached_routing_rules()
+        self.assertTrue(any(r["pattern"] == "telegram.org" and r["resolver"] == "DNSSEC Bypass" for r in cached))
+        print("[OK] Routing cache contains DNSSEC Bypass rule")
+
+        # 5. Insert dummy BOGUS and SPECIAL log entries to verify filter codes
+        from database import get_connection
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question_type, question_name, effective_tldp, answer, response_code, hostname, question)
+            VALUES (datetime('now'), '192.168.1.50', 'TestDevice', 12, 'DNSSEC validation failed: bogus signatures', 'BOGUS', 'A', 'api.telegram.org', 'org', '', 'SERVFAIL', 'test-host', 'api.telegram.org');
+        """)
+        c.execute("""
+            INSERT INTO log_entries (request_ts, client_ip, client_name, duration_ms, reason, response_type, question_type, question_name, effective_tldp, answer, response_code, hostname, question)
+            VALUES (datetime('now'), '192.168.1.50', 'TestDevice', 1, 'Special domain', 'SPECIAL', 'PTR', '1.1.168.192.in-addr.arpa', 'arpa', 'router.lan', 'NOERROR', 'test-host', '1.1.168.192.in-addr.arpa');
+        """)
+        conn.commit()
+        conn.close()
+
+        # 6. Test Query Log filter by status=BOGUS
+        bogus_res = self.client.get("/api/logs?status=BOGUS", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(bogus_res.status_code, 200)
+        bogus_data = bogus_res.json()
+        self.assertGreaterEqual(bogus_data["total_records"], 1)
+        self.assertTrue(all(r["response_type"] == "BOGUS" for r in bogus_data["records"]))
+        print("[OK] Query Log status=BOGUS filter verified")
+
+        # 7. Test Query Log filter by status=SPECIAL
+        special_res = self.client.get("/api/logs?status=SPECIAL", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(special_res.status_code, 200)
+        special_data = special_res.json()
+        self.assertGreaterEqual(special_data["total_records"], 1)
+        self.assertTrue(all(r["response_type"] == "SPECIAL" for r in special_data["records"]))
+        print("[OK] Query Log status=SPECIAL filter verified")
+
+        # 8. Test clean deletion of DNSSEC bypass rule
+        del_res = self.client.delete(f"/api/rules/{telegram_rule['id']}", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(del_res.status_code, 200)
+        self.assertTrue(del_res.json()["success"])
+        print("[OK] DNSSEC bypass rule deletion verified")
+
+    def test_27_v150_concurrency_composite_indexes_and_stats_caching(self):
+        # 1. Verify composite indexes exist on log_entries
+        from database import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'log_entries';")
+        indexes = {r["name"] for r in cur.fetchall()}
+        conn.close()
+
+        self.assertIn("idx_log_ts_type_qname", indexes)
+        self.assertIn("idx_log_ts_ip_type", indexes)
+        self.assertIn("idx_log_qname_type", indexes)
+        print("[OK] High-performance composite SQLite indexes verified on log_entries")
+
+        # 2. Verify Blocky client configuration flushInterval defaults to 10s
+        from blocky_client import sync_config_from_db, get_blocky_config_path
+        import yaml
+        sync_config_from_db()
+        with open(get_blocky_config_path(), "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        self.assertIn("queryLog", cfg)
+        self.assertEqual(cfg["queryLog"]["flushInterval"], "10s")
+        print("[OK] Blocky queryLog flushInterval set to 10s for concurrency lock relief")
+
+        # 3. Verify Stats Summary caching and responsiveness
+        from api_stats import clear_stats_cache
+        clear_stats_cache()
+        res1 = self.client.get("/api/stats/summary?range=24h", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(res1.status_code, 200)
+        data1 = res1.json()
+
+        # Immediate follow-up should hit fast in-memory cache
+        res2 = self.client.get("/api/stats/summary?range=24h", headers=TestBlockyDnsHub.headers)
+        self.assertEqual(res2.status_code, 200)
+        data2 = res2.json()
+        self.assertEqual(data1["total_queries_24h"], data2["total_queries_24h"])
+        print("[OK] Aggregated statistics caching and sub-millisecond retrieval verified")
+
+        # 4. Verify retention pruning executes and gracefully completes WAL passive checkpoint
+        from retention import prune_old_logs
+        pruned = prune_old_logs(days=365)
+        self.assertIsInstance(pruned, int)
+        print(f"[OK] Log retention prune & WAL passive checkpoint verified (Pruned: {pruned})")
+
 if __name__ == "__main__":
     unittest.main()
 

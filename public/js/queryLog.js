@@ -155,20 +155,39 @@ function changeLogPage(delta) {
 }
 
 async function quickAddRule(type, domain) {
+  let targetDomain = (domain || "").trim();
+  let comment = `Added from Query Log`;
+  if (type === "dnssec_bypass") {
+    // If it's a subdomain like api.telegram.org, generate wildcard *.telegram.org to cover all service endpoints
+    const parts = targetDomain.toLowerCase().replace(/^\*\./, "").split(".").filter(Boolean);
+    if (parts.length > 2) {
+      targetDomain = `*.${parts.slice(-2).join(".")}`;
+    }
+    comment = `DNSSEC validation bypass for ${domain}`;
+  }
+
   try {
     const res = await apiRequest("/api/rules/add", {
       method: "POST",
       body: JSON.stringify({
         rule_type: type,
-        domain: domain,
-        comment: `Added from Query Log`
+        domain: targetDomain,
+        comment: comment
       })
     });
     if (res && res.success) {
-      showToast(`Added ${domain} to ${type}`);
+      if (type === "dnssec_bypass") {
+        showToast(`DNSSEC validation bypass active for ${targetDomain}`, "success");
+      } else {
+        showToast(`Added ${targetDomain} to ${type}`);
+      }
       refreshQueryLogs();
+      if (typeof loadRoutingRulesCache === "function") {
+        loadRoutingRulesCache(true);
+      }
     }
   } catch (err) {
+    showToast(`Failed to add rule: ${err.message}`, "error");
     console.error(err);
   }
 }
@@ -390,13 +409,20 @@ function formatQueryReason(reason, responseType, question) {
     // A. Check if raw already has enriched resolver like "CONDITIONAL (tcp-tls:... [Tag])"
     const match = raw.match(/^CONDITIONAL\s*\((.+)\)$/i);
     if (match) {
-      return `Upstream: ${match[1].trim()}`;
+      const inner = match[1].trim();
+      if (inner.toLowerCase().includes("dnssec bypass")) {
+        return `🛡️ DNSSEC Bypassed (${inner})`;
+      }
+      return `Upstream: ${inner}`;
     }
     // B. Fallback: match domain question against active routing rules
     if (question && cachedRoutingRules.length > 0) {
       const q = question.toLowerCase().trim().replace(/\.$/, "");
       const matched = cachedRoutingRules.find(r => q === r.pattern || q.endsWith("." + r.pattern));
       if (matched) {
+        if (matched.resolver === "DNSSEC Bypass" || (matched.tag || "").includes("DNSSEC Bypass")) {
+          return "🛡️ DNSSEC Bypassed (Domain Routing)";
+        }
         const tagPart = matched.tag ? ` [${matched.tag}]` : "";
         return `Upstream: ${matched.resolver}${tagPart}`;
       }
@@ -407,7 +433,15 @@ function formatQueryReason(reason, responseType, question) {
     return "Domain Routing (Custom Upstream)";
   }
 
-  // 4. CACHED
+  // 4. BOGUS (DNSSEC Failure)
+  if (type === "BOGUS") {
+    if (!raw || raw.toUpperCase() === "BOGUS") {
+      return "DNSSEC validation failed: bogus signatures";
+    }
+    return raw;
+  }
+
+  // 5. CACHED
   if (type === "CACHED") {
     // If reason is just CACHED or empty, don't show any redundant text
     if (!raw || raw.toUpperCase() === "CACHED" || raw.toLowerCase() === "cache hit") {
@@ -416,12 +450,12 @@ function formatQueryReason(reason, responseType, question) {
     return raw;
   }
 
-  // 5. CUSTOMDNS
+  // 6. CUSTOMDNS
   if (type === "CUSTOMDNS") {
     return "Local DNS record";
   }
 
-  // 6. HOSTSFILE
+  // 7. HOSTSFILE
   if (type === "HOSTSFILE") {
     return "Hosts file entry";
   }
@@ -435,15 +469,20 @@ function renderLogRow(r) {
   const iconMap = { tv: "📺", laptop: "💻", phone: "📱", tablet: "📱", iot: "💡", server: "🖥️", printer: "🖨️", device: "🔌" };
   const icon = iconMap[r.client_icon] || "🔌";
   let pillClass = "resolved";
-  if (r.response_type === "BLOCKED") pillClass = "blocked";
+  if (r.response_type === "BLOCKED" || r.response_type === "REBIND") pillClass = "blocked";
   else if (r.response_type === "CACHED") pillClass = "cached";
+  else if (r.response_type === "BOGUS") pillClass = "bogus";
+  else if (r.response_type === "CONDITIONAL") pillClass = "conditional";
+  else if (r.response_type === "CUSTOMDNS") pillClass = "customdns";
+  else if (r.response_type === "SPECIAL") pillClass = "special";
 
   const localTimeStr = formatLocalIsoTimestamp(r.request_ts);
   const answerHtml = formatResolvedAnswer(r.answer, r.response_type, r.id);
   const qType = r.question_type || "A";
   const reasonText = formatQueryReason(r.reason, r.response_type, r.question);
   const isBlockedType = (r.response_type === "BLOCKED" || r.response_type === "REBIND");
-  const reasonColor = isBlockedType ? "var(--accent-red)" : "var(--text-dim)";
+  const isBogus = (r.response_type === "BOGUS");
+  const reasonColor = isBlockedType ? "var(--accent-red)" : (isBogus ? "#f59e0b" : "var(--text-dim)");
 
   const safeLocalTime = escapeHtml(localTimeStr);
   const safeClientName = escapeHtml(r.client_name || r.client_ip);
@@ -493,11 +532,13 @@ function renderLogRow(r) {
       <td class="col-actions">
         <div class="actions-button-group">
           <button class="btn btn-secondary btn-sm" data-domain="${safeQuestion}" onclick="window.openWhoisModal(this.dataset.domain)" title="Inspect WHOIS & Domain Intelligence">ℹ️ Whois</button>
-          ${isBlockedType ? `
+          ${isBogus ? `
+            <button class="btn btn-warning btn-sm btn-bypass-dnssec" data-domain="${safeQuestion}" onclick="quickAddRule('dnssec_bypass', this.dataset.domain)" title="Bypass DNSSEC validation for this domain" style="color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1);">🛡️ Bypass DNSSEC</button>
+          ` : (isBlockedType ? `
             <button class="btn btn-secondary btn-sm btn-allow" data-domain="${safeQuestion}" onclick="quickAddRule('whitelist', this.dataset.domain)" title="Whitelist domain (Unblock)" style="color: var(--accent-green); border-color: rgba(16, 185, 129, 0.4);">✓ Allow</button>
           ` : `
             <button class="btn btn-danger btn-sm btn-block" data-domain="${safeQuestion}" onclick="quickAddRule('blacklist', this.dataset.domain)" title="Blacklist domain (Block)">✕ Block</button>
-          `}
+          `)}
         </div>
       </td>
     </tr>
@@ -567,7 +608,7 @@ function toggleLiveStream() {
       const clientIp = document.getElementById("logDeviceSelect")?.value || "";
       const status = document.getElementById("logStatusSelect")?.value || "ALL";
 
-      if (!includePtr) {
+      if (!includePtr && status !== "SPECIAL") {
         const q = (log.question || "").toLowerCase();
         if (q.includes(".in-addr.arpa") || q.includes(".ip6.arpa") || log.response_type === "SPECIAL" || (log.reason || "").toLowerCase().includes("special")) {
           return;
@@ -683,9 +724,10 @@ async function openWhoisModal(domain) {
           </div>
           <div>
             <div style="font-size: 0.74rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600;">Quick Rule Action</div>
-            <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <div style="display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
               <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" onclick="quickAddRule('whitelist', '${cleanDomain}'); closeWhoisModal();">✓ Allow</button>
               <button class="btn btn-danger btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" onclick="quickAddRule('blacklist', '${cleanDomain}'); closeWhoisModal();">✕ Block</button>
+              <button class="btn btn-warning btn-sm" style="padding: 2px 8px; font-size: 0.75rem; color: #f59e0b;" onclick="quickAddRule('dnssec_bypass', '${cleanDomain}'); closeWhoisModal();" title="Bypass DNSSEC validation">🛡️ Bypass DNSSEC</button>
             </div>
           </div>
         </div>

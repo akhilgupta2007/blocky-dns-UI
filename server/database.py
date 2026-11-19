@@ -295,6 +295,9 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_question ON log_entries(question);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_type ON log_entries(request_ts, response_type);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_ip ON log_entries(request_ts, client_ip);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_type_qname ON log_entries(request_ts, response_type, question_name);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_ts_ip_type ON log_entries(request_ts, client_ip, response_type);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_qname_type ON log_entries(question_name, response_type);")
 
     # 10. Blocked Services table (1-Click App/Platform blocking catalog)
     cursor.execute("""

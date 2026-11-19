@@ -232,6 +232,29 @@ def sync_config_from_db():
     except Exception:
         pass
 
+    # 3.5 DNSSEC Bypass Rules (Custom rules with rule_type = 'dnssec_bypass')
+    # Bypasses Blocky's local DNSSEC validator for domains with broken/bogus signatures (e.g. *.telegram.org)
+    cursor.execute("SELECT domain FROM custom_rules WHERE rule_type = 'dnssec_bypass' AND enabled = 1;")
+    dnssec_bypass_rows = cursor.fetchall()
+    if dnssec_bypass_rows:
+        bypass_upstream = "https://1.1.1.1/dns-query"
+        for u in upstream_rows:
+            ep = u["endpoint"]
+            if "1.1.1.1" in ep or "8.8.8.8" in ep:
+                bypass_upstream = ep
+                break
+        for row in dnssec_bypass_rows:
+            dom = row["domain"].strip().lower()
+            if dom.startswith("*."):
+                clean_dom = dom[2:]
+            elif dom.startswith("."):
+                clean_dom = dom[1:]
+            else:
+                clean_dom = dom
+            clean_dom = clean_dom.rstrip(".")
+            if clean_dom and clean_dom not in conditional_mapping:
+                conditional_mapping[clean_dom] = bypass_upstream
+
     # 4. Fetch enabled blocklists
     cursor.execute("SELECT url FROM blocklists WHERE enabled = 1;")
     blocklist_rows = cursor.fetchall()
@@ -399,7 +422,7 @@ def sync_config_from_db():
             "type": "sqlite",
             "target": os.getenv("BLOCKY_DB_TARGET", "/app/data/blockydns.db"),
             "logRetentionDays": retention_days,
-            "flushInterval": "2s"
+            "flushInterval": os.getenv("BLOCKY_FLUSH_INTERVAL", "10s")
         },
         "ports": {
             "dns": 53,

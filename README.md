@@ -8,7 +8,7 @@
 [![DNS Engine](https://img.shields.io/badge/DNS%20Engine-Blocky%20(Go)-00ADD8?logo=go)](https://github.com/0xERR0R/blocky)
 [![Security](https://img.shields.io/badge/Security-TLS%201.3%20%2B%20Strict%20DoH%2FDoT-00f5d4)](#-security--anti-sniffing-shield)
 [![RAM Footprint](https://img.shields.io/badge/Total%20RAM-%7E118%20MB-purple)](#-performance-benchmarks-raspberry-pi-1gb-ram)
-[![Release](https://img.shields.io/badge/Release-v1.3.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
+[![Release](https://img.shields.io/badge/Release-v1.5.0-green.svg)](https://github.com/akhilgupta2007/blocky-dns-UI/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -99,12 +99,14 @@ Most homelab setups rely on either **Pi-hole** or **AdGuard Home**. BlockyDNS wa
   * Directly import rules in standard AdGuard format (e.g. `@@||domain.com^$important` for Whitelist and `||domain.com^` for Blacklist).
   * Automatically categorizes, strips syntax markers, and compiles them directly into native Blocky engine text files.
 * **Streaming Asynchronous Rule Counter**: Accurately counts rules from remote hosts files and raw domain lists in the background using non-blocking HTTP streaming, with real-time UI status (`⚡ Counting rules...`), automatic background backfilling, and human-readable timestamps.
-* **Structured Custom Rules List**: View rules in a clean, searchable table with domain badges, scopes (Exact / Wildcard / Regex), and instant search filtering.
+* **Structured Custom Rules & DNSSEC Bypass**: View rules in a clean, searchable table with domain badges, scopes (Exact / Wildcard / Regex), and instant search filtering. Includes dedicated **DNSSEC Bypass** rules to bypass strict local validation for broken or complex domains (e.g. `*.telegram.org`) while keeping DNSSEC enforced globally.
 
 ### 🔍 3. Live Query Log & Threat Intelligence
 * **Real-time Server-Sent Events (SSE)**: Live, non-polling stream of DNS requests as they occur.
+* **Comprehensive Status Filter Codes**: Filter queries by all response codes: `ALL`, `RESOLVED`, `CACHED`, `BLOCKED`, `BOGUS` (DNSSEC validation failed), `CONDITIONAL` (Domain Routing), `CUSTOMDNS` (Local records), and `SPECIAL` (SUDN/PTR).
 * **Resolved IP Address Display**: Inspect exact IP addresses returned by upstream resolvers directly in the log.
-* **1-Click Domain Intelligence**:
+* **1-Click Threat & Exception Actions**:
+  * **🛡️ Bypass DNSSEC**: 1-click action for `BOGUS` queries to automatically whitelist and route broken DNSSEC domains through clean resolvers.
   * **🌐 WHOIS Lookup**: Registrar, registration date, organization, and IP routing blocks.
   * **🛡️ VirusTotal Integration**: 1-click sandbox score inspection for suspicious domains.
   * **👻 Ghostery WhoTracks.Me**: Inspect tracking behavior, advertising profiles, and privacy risk scores.
@@ -411,6 +413,55 @@ docker compose up -d --build
 ---
 
 ## 📋 Changelog & Version History
+
+### [v1.5.0] - 2026-11-18
+
+#### ⚡ Database Concurrency, Lock Contention & Disk Exhaustion Resilience
+* **Elimination of `SQLITE_BUSY (5)` & `SQLITE_FULL (13)` Contention**:
+  * Increased Blocky SQLite query log batch `flushInterval` from `2s` to `10s` (configurable via `BLOCKY_FLUSH_INTERVAL`), reducing write lock contention on `blockydns.db` by 80–90% under high DNS query volumes.
+  * Added Docker JSON container log limits (`max-size: 10m`, `max-file: 3`) across `docker-compose.yml` and `docker-compose.ghcr.yml` to prevent unbounded `/var/lib/docker/containers/*/*-json.log` file growth from exhausting host disk space.
+  * Added automated `PRAGMA wal_checkpoint(PASSIVE);` during scheduled retention cycles in `retention.py` to prevent runaway Write-Ahead Log (`blockydns.db-wal`) journal expansion.
+* **High-Performance Composite SQLite Indexes**:
+  * Added targeted composite indexes on `log_entries` in `database.py`:
+    * `idx_log_ts_type_qname` (`request_ts`, `response_type`, `question_name`)
+    * `idx_log_ts_ip_type` (`request_ts`, `client_ip`, `response_type`)
+    * `idx_log_qname_type` (`question_name`, `response_type`)
+  * Transforms multi-column aggregations (`top-domains`, `top-devices`, and timeline buckets) into index-only scans, eliminating costly full-table scans across hundreds of thousands of rows.
+
+#### 🚀 Instant Staged Dashboard Loading & Zero-Flash Elimination
+* **Decoupled Asynchronous Dashboard Stages**: Replaced the blocking `Promise.all` in `dashboard.js` with staged non-blocking requests:
+  * **Stage 1 (Instant ~50–150ms)**: Loads KPI Summary, Active Devices badge, and Donut distribution chart immediately.
+  * **Stage 2 (Parallel)**: Asynchronously draws Timeline Area Chart as data arrives.
+  * **Stage 3 & 4 (Parallel)**: Asynchronously populates Top Blocked Domains and Client Device breakdown table without freezing the top KPIs.
+* **Instant First-Paint via Stale-While-Revalidate**: Cached last-known KPI statistics in browser `localStorage`. Upon logging in or switching tabs, real statistics paint in 0ms while background network revalidation completes seamlessly.
+* **Replaced Hardcoded Zero HTML with Animated Skeleton Shimmers**: Replaced initial `0` and `0.0%` placeholder values in `index.html` with elegant animated CSS pulse skeletons (`<span class="kpi-skeleton">--</span>`), preventing misleading zero flashes.
+* **Optimized Aggregation Cache TTL**: Increased backend statistics cache TTL (`_STATS_TTL_SECONDS`) in `api_stats.py` from 4.0s to 30.0s, and reduced frontend background auto-refresh interval from 10s to 30s, cutting redundant table scans by up to 66%.
+
+---
+
+### [v1.4.0] - 2026-11-07
+
+#### 🛡️ DNSSEC Bypass for Custom Rules & Generic Wildcards
+* **Custom Rule DNSSEC Bypass**: Added first-class support for `rule_type = 'dnssec_bypass'` across custom domain rules and bulk rule importers. Domains with broken/bogus signatures (such as `*.telegram.org` or `telegram.org`) can be bypassed from local DNSSEC validation without disabling DNSSEC globally.
+* **Smart Conditional Engine Compilation**: Blocky client automatically compiles active DNSSEC bypass rules into Blocky's `conditional.mapping` targeting trusted public upstreams (e.g. `1.1.1.1`), cleanly circumventing upstream TLD validation issues while keeping DNSSEC validation enforced everywhere else.
+* **1-Click Query Log DNSSEC Bypass**: Added interactive `🛡️ Bypass DNSSEC` button in the Query Log actions column for queries flagged with `BOGUS` (such as `api.telegram.org`), instantly generating and activating the rule with zero friction.
+* **Live In-Memory Routing Cache Enrichment**: Synchronized DNSSEC bypass rules into the in-memory routing cache (`routing_cache.py`), automatically labelling bypassed query logs as `🛡️ DNSSEC Bypassed (Domain Routing)`.
+
+#### 🔍 Comprehensive Query Log Status Filter Codes
+* **Complete Status Filter Coverage**: Expanded the Query Log status dropdown filter to support all possible Blocky query response states:
+  * `ALL`: All queries without status restriction.
+  * `RESOLVED`: Resolved Upstream (Green).
+  * `CACHED`: Served from Cache (Cyan).
+  * `BLOCKED`: Blocked by Denylist or DNS Rebind (Red).
+  * `BOGUS`: DNSSEC Bogus / Validation Failed (Amber).
+  * `CONDITIONAL`: Custom Routed / Domain Routing (Purple).
+  * `CUSTOMDNS`: Local / Static DNS Record (Blue).
+  * `SPECIAL`: Special-Use Domain Name / SUDN (Slate).
+* **Backend Filter Parameterization Bugfix**: Fixed an issue in `api_logs.py` where filtering by `SPECIAL` conflicted with background SUDN/PTR suppression conditions.
+* **Distinct Visual Status Badges**: Added dedicated `.pill.bogus`, `.pill.conditional`, `.pill.customdns`, and `.pill.special` badge styles in `style.css`.
+* **Automated Unit & Regression Tests**: Added `test_26_dnssec_bypass_custom_rules_and_status_filter_codes` in `test_backend.py` verifying end-to-end DNSSEC bypass compilation, routing cache synchronization, status filtering, and cleanup.
+
+---
 
 ### [v1.3.0] - 2026-10-28
 

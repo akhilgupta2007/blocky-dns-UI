@@ -23,85 +23,120 @@ async function onDashVolumeRangeChange() {
 async function loadDashboard() {
   try {
     const range = getDashVolumeRange();
-    const [summary, timeline, topDomains, topDevices, settings] = await Promise.all([
-      apiRequest(`/api/stats/summary?range=${encodeURIComponent(range)}`),
-      apiRequest(`/api/stats/timeline?range=${encodeURIComponent(range)}`),
-      apiRequest(`/api/stats/top-domains?range=${encodeURIComponent(range)}&limit=10`),
-      apiRequest(`/api/stats/top-devices?range=${encodeURIComponent(range)}`),
-      apiRequest("/api/control/settings").catch(() => null)
-    ]);
 
-    if (!summary) return;
-    cachedSummaryData = summary;
-    if (topDomains) cachedTopDomainsData = topDomains;
-    if (topDevices) cachedDashboardDevices = Array.isArray(topDevices) ? topDevices : [];
+    // Check localStorage cache for instantaneous first-paint (avoids initial blank/zeros)
+    try {
+      const cached = localStorage.getItem("blockydns_cached_kpis");
+      if (cached) {
+        const kpi = JSON.parse(cached);
+        if (kpi && typeof kpi.total_queries_24h === "number") {
+          const totalEl = document.getElementById("kpiTotalQueries");
+          const blockedEl = document.getElementById("kpiBlockedQueries");
+          const pctEl = document.getElementById("kpiBlockedPct");
+          const devicesEl = document.getElementById("kpiActiveDevices");
+          const rulesEl = document.getElementById("kpiActiveRules");
+          if (totalEl && totalEl.querySelector(".kpi-skeleton")) totalEl.textContent = kpi.total_queries_24h.toLocaleString();
+          if (blockedEl && blockedEl.querySelector(".kpi-skeleton")) blockedEl.textContent = kpi.blocked_queries_24h.toLocaleString();
+          if (pctEl && pctEl.querySelector(".kpi-skeleton")) pctEl.textContent = `${kpi.blocked_percent}%`;
+          if (devicesEl && devicesEl.querySelector(".kpi-skeleton")) devicesEl.textContent = kpi.active_devices_count;
+          if (rulesEl && rulesEl.querySelector(".kpi-skeleton")) rulesEl.textContent = kpi.active_rules_count.toLocaleString();
+        }
+      }
+    } catch (e) {}
 
-    // Format human-friendly label for current window
-    const retentionDays = (settings && settings.log_retention_days) ? parseInt(settings.log_retention_days, 10) : 7;
-    let windowLabel = "Full Retention Window";
-    let windowShort = "Retention Window";
-    if (range === "24h" || range === "1d") {
-      windowLabel = "24-Hour Query Volume";
-      windowShort = "Last 24h";
-    } else if (range === "3d") {
-      windowLabel = "3-Day Query Volume";
-      windowShort = "Last 3 Days";
-    } else {
-      windowLabel = `Query Volume (${retentionDays}d Retention)`;
-      windowShort = `${retentionDays}d Window`;
-    }
+    // Decoupled / Staged Loading: Fetch settings in background
+    apiRequest("/api/control/settings").then(settings => {
+      const retentionDays = (settings && settings.log_retention_days) ? parseInt(settings.log_retention_days, 10) : 7;
+      let windowLabel = "Full Retention Window";
+      let windowShort = "Retention Window";
+      if (range === "24h" || range === "1d") {
+        windowLabel = "24-Hour Query Volume";
+        windowShort = "Last 24h";
+      } else if (range === "3d") {
+        windowLabel = "3-Day Query Volume";
+        windowShort = "Last 3 Days";
+      } else {
+        windowLabel = `Query Volume (${retentionDays}d Retention)`;
+        windowShort = `${retentionDays}d Window`;
+      }
 
-    const titleEl = document.getElementById("timelineTitle");
-    if (titleEl) titleEl.textContent = windowLabel;
+      const titleEl = document.getElementById("timelineTitle");
+      if (titleEl) titleEl.textContent = windowLabel;
+      const donutPill = document.getElementById("donutRangePill");
+      if (donutPill) donutPill.textContent = windowShort;
+      const topBlockedPill = document.getElementById("topBlockedRangePill");
+      if (topBlockedPill) topBlockedPill.textContent = windowShort;
+      const devPill = document.getElementById("deviceBreakdownRangePill");
+      if (devPill) devPill.textContent = windowShort;
+    }).catch(() => null);
 
-    const donutPill = document.getElementById("donutRangePill");
-    if (donutPill) donutPill.textContent = windowShort;
+    // Stage 1: Load KPI Summary & Donut Chart (Fastest - renders in ~50-150ms)
+    const summaryPromise = apiRequest(`/api/stats/summary?range=${encodeURIComponent(range)}`).then(summary => {
+      if (!summary) return null;
+      cachedSummaryData = summary;
+      try {
+        localStorage.setItem("blockydns_cached_kpis", JSON.stringify(summary));
+      } catch (e) {}
 
-    const topBlockedPill = document.getElementById("topBlockedRangePill");
-    if (topBlockedPill) topBlockedPill.textContent = windowShort;
+      // Update KPIs
+      const totalEl = document.getElementById("kpiTotalQueries");
+      const blockedEl = document.getElementById("kpiBlockedQueries");
+      const pctEl = document.getElementById("kpiBlockedPct");
+      const devicesEl = document.getElementById("kpiActiveDevices");
+      const rulesEl = document.getElementById("kpiActiveRules");
+      const latencyEl = document.getElementById("kpiLatencyText");
 
-    const devPill = document.getElementById("deviceBreakdownRangePill");
-    if (devPill) devPill.textContent = windowShort;
+      if (totalEl) totalEl.textContent = summary.total_queries_24h.toLocaleString();
+      if (blockedEl) blockedEl.textContent = summary.blocked_queries_24h.toLocaleString();
+      if (pctEl) pctEl.textContent = `${summary.blocked_percent}%`;
+      if (devicesEl) devicesEl.textContent = summary.active_devices_count;
+      const devBadge = document.getElementById("devicesNavBadge");
+      if (devBadge) {
+        devBadge.textContent = summary.active_devices_count || 0;
+        devBadge.style.display = summary.active_devices_count > 0 ? "inline-block" : "none";
+      }
+      if (rulesEl) rulesEl.textContent = summary.active_rules_count.toLocaleString();
+      if (latencyEl) latencyEl.textContent = `${summary.upstream_latency_ms}ms via Encrypted DoH`;
 
-    // Update KPIs
-    const totalEl = document.getElementById("kpiTotalQueries");
-    const blockedEl = document.getElementById("kpiBlockedQueries");
-    const pctEl = document.getElementById("kpiBlockedPct");
-    const devicesEl = document.getElementById("kpiActiveDevices");
-    const rulesEl = document.getElementById("kpiActiveRules");
-    const latencyEl = document.getElementById("kpiLatencyText");
+      // Synchronize Pause Protection status
+      syncProtectionStatusUI(summary.blocking_enabled);
+      if (typeof updateBlockingBadge === "function") {
+        updateBlockingBadge(summary.blocking_enabled);
+      }
 
-    if (totalEl) totalEl.textContent = summary.total_queries_24h.toLocaleString();
-    if (blockedEl) blockedEl.textContent = summary.blocked_queries_24h.toLocaleString();
-    if (pctEl) pctEl.textContent = `${summary.blocked_percent}%`;
-    if (devicesEl) devicesEl.textContent = summary.active_devices_count;
-    const devBadge = document.getElementById("devicesNavBadge");
-    if (devBadge) {
-      devBadge.textContent = summary.active_devices_count || 0;
-      devBadge.style.display = summary.active_devices_count > 0 ? "inline-block" : "none";
-    }
-    if (rulesEl) rulesEl.textContent = summary.active_rules_count.toLocaleString();
-    if (latencyEl) latencyEl.textContent = `${summary.upstream_latency_ms}ms via Encrypted DoH`;
+      // Donut Query Distribution Chart
+      drawDonutChart(summary.query_distribution, summary.total_queries_24h, summary.blocked_queries_24h);
+      return summary;
+    }).catch(err => {
+      console.error("Error loading summary:", err);
+      return null;
+    });
 
-    // Synchronize Pause Protection status
-    syncProtectionStatusUI(summary.blocking_enabled);
-    if (typeof updateBlockingBadge === "function") {
-      updateBlockingBadge(summary.blocking_enabled);
-    }
+    // Stage 2: Timeline Area Chart (Parallel, non-blocking)
+    apiRequest(`/api/stats/timeline?range=${encodeURIComponent(range)}`).then(timeline => {
+      if (timeline) {
+        cachedTimelineData = timeline;
+        drawTimelineChart(timeline);
+      }
+    }).catch(err => console.error("Error loading timeline:", err));
 
-    // Donut Query Distribution Chart
-    drawDonutChart(summary.query_distribution, summary.total_queries_24h, summary.blocked_queries_24h);
+    // Stage 3: Top Blocked Domains (Parallel, non-blocking)
+    apiRequest(`/api/stats/top-domains?range=${encodeURIComponent(range)}&limit=10`).then(topDomains => {
+      if (topDomains && topDomains.top_blocked) {
+        cachedTopDomainsData = topDomains;
+        renderTopBlocked(topDomains.top_blocked);
+      }
+    }).catch(err => console.error("Error loading top domains:", err));
 
-    // Timeline Area Chart
-    if (timeline) drawTimelineChart(timeline);
+    // Stage 4: Client Devices Breakdown (Parallel, non-blocking)
+    apiRequest(`/api/stats/top-devices?range=${encodeURIComponent(range)}`).then(topDevices => {
+      if (topDevices) {
+        cachedDashboardDevices = Array.isArray(topDevices) ? topDevices : [];
+        sortAndRenderDashboardDevices();
+      }
+    }).catch(err => console.error("Error loading top devices:", err));
 
-    // Top Blocked Domains (up to 10 with scrollbar)
-    if (topDomains && topDomains.top_blocked) {
-      renderTopBlocked(topDomains.top_blocked);
-    }
-
-    // Client Device Breakdown
-    sortAndRenderDashboardDevices();
+    await summaryPromise;
   } catch (err) {
     console.error("Error loading dashboard:", err);
   }

@@ -19,7 +19,7 @@
         <div class="brand-text">
           <div style="display: flex; align-items: center; gap: 6px;">
             <h2>BlockyDNS Hub</h2>
-            <span class="version-badge" style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); padding: 1px 5px; border-radius: 4px; font-weight: 600;">v1.3.0</span>
+            <span class="version-badge" style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); padding: 1px 5px; border-radius: 4px; font-weight: 600;">v1.5.0</span>
           </div>
           <span>Homelab DNS</span>
         </div>
@@ -106,7 +106,7 @@
           </div>
         </div>
         <div style="margin-top: 8px; text-align: center; font-size: 0.72rem; color: #94a3b8; opacity: 0.85;">
-          BlockyDNS Hub &bull; <span>v1.3.0</span>
+          BlockyDNS Hub &bull; <span>v1.5.0</span>
         </div>
       </div>
 
@@ -205,7 +205,7 @@
                   <svg style="width: 20px; height: 20px; color: var(--accent-green);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 </div>
               </div>
-              <div class="kpi-value" id="kpiTotalQueries">0</div>
+              <div class="kpi-value" id="kpiTotalQueries"><span class="kpi-skeleton">--</span></div>
               <div class="kpi-subtext" style="color: var(--accent-green);">View all queries ➔</div>
             </div>
 
@@ -217,8 +217,8 @@
                 </div>
               </div>
               <div class="kpi-value">
-                <span id="kpiBlockedQueries">0</span>
-                <span class="pill blocked" id="kpiBlockedPct" style="font-size: 0.8rem;">0.0%</span>
+                <span id="kpiBlockedQueries"><span class="kpi-skeleton">--</span></span>
+                <span class="pill blocked" id="kpiBlockedPct" style="font-size: 0.8rem;"><span class="kpi-skeleton">--%</span></span>
               </div>
               <div class="kpi-subtext" style="color: #c084fc;">View blocked queries ➔</div>
             </div>
@@ -230,7 +230,7 @@
                   <svg style="width: 20px; height: 20px; color: var(--accent-cyan);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                 </div>
               </div>
-              <div class="kpi-value" id="kpiActiveDevices">0</div>
+              <div class="kpi-value" id="kpiActiveDevices"><span class="kpi-skeleton">--</span></div>
               <div class="kpi-subtext" style="color: var(--accent-cyan); display: flex; align-items: center; justify-content: space-between;">
                 <span>Manage client devices</span>
                 <span style="font-size: 1rem; font-weight: bold;">↗</span>
@@ -244,7 +244,7 @@
                   <svg style="width: 20px; height: 20px; color: var(--accent-amber);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 </div>
               </div>
-              <div class="kpi-value" id="kpiActiveRules">0</div>
+              <div class="kpi-value" id="kpiActiveRules"><span class="kpi-skeleton">--</span></div>
               <div class="kpi-subtext" id="kpiLatencyText" style="color: var(--accent-amber);">Manage blocklists ➔</div>
             </div>
           </div>
@@ -354,12 +354,15 @@
               <option value="">All Devices</option>
             </select>
 
-            <select id="logStatusSelect" class="form-select" style="width: 165px;" onchange="handleLogFilterChange()">
+            <select id="logStatusSelect" class="form-select" style="width: 180px;" onchange="handleLogFilterChange()">
               <option value="ALL">All Statuses</option>
-              <option value="BLOCKED">Blocked Only</option>
               <option value="RESOLVED">Resolved Only</option>
               <option value="CACHED">Cached Only</option>
+              <option value="BLOCKED">Blocked Only</option>
+              <option value="BOGUS">DNSSEC Bogus Only</option>
               <option value="CONDITIONAL">Custom Routed Only</option>
+              <option value="CUSTOMDNS">Local / Custom DNS</option>
+              <option value="SPECIAL">Special Domain / SUDN</option>
             </select>
 
             <select id="logDateRangeSelect" class="form-select" style="width: 165px;" onchange="handleDateRangeChange()">
@@ -484,16 +487,17 @@
               </div>
 
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   <button id="tabWhitelistBtn" class="btn btn-primary btn-sm" onclick="switchRuleTab('whitelist')">Whitelist (Allow)</button>
                   <button id="tabBlacklistBtn" class="btn btn-secondary btn-sm" onclick="switchRuleTab('blacklist')">Blacklist (Block)</button>
+                  <button id="tabDnssecBypassBtn" class="btn btn-secondary btn-sm" onclick="switchRuleTab('dnssec_bypass')">🛡️ DNSSEC Bypass</button>
                 </div>
                 <input type="text" id="ruleSearchInput" class="form-input" placeholder="🔍 Search rules..." oninput="filterRulesList(this.value)" style="width: 170px; padding: 4px 10px; font-size: 0.8rem;">
               </div>
 
               <form onsubmit="handleAddRule(event)" style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
                 <input type="text" id="newRuleDomain" class="form-input" placeholder="domain.com, *.wildcard, or ||adguard.rule^" required style="flex: 1; min-width: 220px;">
-                <button type="submit" class="btn btn-primary btn-sm">+ Add Rule</button>
+                <button type="submit" id="btnAddRuleSubmit" class="btn btn-primary btn-sm">+ Add Rule</button>
               </form>
 
               <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
@@ -943,6 +947,18 @@
                         <span class="slider"></span>
                       </label>
                     </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.22); border-radius: 8px;">
+                      <div style="max-width: 75%;">
+                        <strong style="font-size: 0.86rem; color: #f59e0b;">DNSSEC Bypass Exceptions</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">
+                          Bypass strict validation for custom domains and wildcards with broken signatures (e.g. <code>*.telegram.org</code>).
+                        </div>
+                      </div>
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="switchView('protection', 'customRules'); switchRuleTab('dnssec_bypass');" style="font-size: 0.78rem; padding: 4px 10px;">
+                        Manage Exceptions ➔
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -952,7 +968,7 @@
                 <div class="card">
                   <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
                     <span>General System Settings</span>
-                    <span class="pill" style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.15); color: var(--accent-cyan); border: 1px solid rgba(59, 130, 246, 0.3);">Release v1.3.0</span>
+                    <span class="pill" style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.15); color: var(--accent-cyan); border: 1px solid rgba(59, 130, 246, 0.3);">Release v1.5.0</span>
                   </div>
 
                   <form onsubmit="handleSaveSettings(event)">
@@ -1266,6 +1282,7 @@
             <select id="importRulesDefaultType" class="form-select" style="padding: 3px 8px; font-size: 0.8rem; width: auto; background: var(--bg-input); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); color: var(--text-main);">
               <option value="blacklist">Blacklist (Block)</option>
               <option value="whitelist">Whitelist (Allow)</option>
+              <option value="dnssec_bypass">DNSSEC Bypass (Skip Validation)</option>
             </select>
           </div>
 

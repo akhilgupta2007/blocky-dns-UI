@@ -585,6 +585,18 @@ table, .kpi-value, .badge, .pill, .status-badge, .stat-value, .shield-status-tex
   gap: 8px;
 }
 
+.kpi-skeleton {
+  color: var(--text-muted);
+  opacity: 0.5;
+  display: inline-block;
+  animation: pulse-kpi-skeleton 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-kpi-skeleton {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.75; }
+}
+
 .kpi-subtext {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -934,6 +946,30 @@ table.modern-table tr[onclick]:hover td {
   background: rgba(6, 182, 212, 0.15);
   color: var(--accent-cyan);
   border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.pill.bogus {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.pill.conditional {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.pill.customdns {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.pill.special {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 /* Buttons */

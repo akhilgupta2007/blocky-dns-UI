@@ -497,12 +497,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial load
   loadDashboard();
-  // Auto-refresh summary every 10s only when tab is visible
+  // Auto-refresh summary every 30s only when tab is visible (reduced from 10s to minimize SQLite lock contention)
   setInterval(() => {
     if (!document.hidden && currentView === "dashboard") {
       loadDashboard();
     }
-  }, 10000);
+  }, 30000);
 
   // Instantly refresh when user returns to this tab
   document.addEventListener("visibilitychange", () => {

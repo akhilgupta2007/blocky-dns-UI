@@ -75,8 +75,11 @@ def get_logs(
         conditions = []
         params = []
 
-        # Filter out internal PTR & SUDN queries unless explicitly requested
-        if not include_ptr:
+        # Support filtering by status or response_type (e.g. BLOCKED, RESOLVED, CACHED, CONDITIONAL, BOGUS, CUSTOMDNS, SPECIAL)
+        stat = (status or response_type or "").strip().upper()
+
+        # Filter out internal PTR & SUDN queries unless explicitly requested or user is specifically filtering by SPECIAL
+        if not include_ptr and stat != "SPECIAL":
             conditions.append(f"({q_expr} NOT LIKE '%.in-addr.arpa%' AND {q_expr} NOT LIKE '%.ip6.arpa%' AND l.response_type != 'SPECIAL' AND COALESCE(l.reason, '') NOT LIKE '%Special%')")
 
         if search:
@@ -88,8 +91,6 @@ def get_logs(
             conditions.append("l.client_ip = ?")
             params.append(client_ip.strip())
 
-        # Support filtering by status or response_type (e.g. BLOCKED, RESOLVED, CACHED, CONDITIONAL)
-        stat = (status or response_type or "").strip().upper()
         if stat and stat != "ALL":
             if stat == "BLOCKED":
                 conditions.append("(l.response_type = 'BLOCKED' OR l.response_type = 'REBIND')")

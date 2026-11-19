@@ -138,8 +138,26 @@ function switchRuleTab(tab) {
   activeRuleTab = tab;
   const wlBtn = document.getElementById("tabWhitelistBtn");
   const blBtn = document.getElementById("tabBlacklistBtn");
+  const dscBtn = document.getElementById("tabDnssecBypassBtn");
+  const input = document.getElementById("newRuleDomain");
+  const submitBtn = document.getElementById("btnAddRuleSubmit");
+
   if (wlBtn) wlBtn.className = tab === "whitelist" ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm";
   if (blBtn) blBtn.className = tab === "blacklist" ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm";
+  if (dscBtn) dscBtn.className = tab === "dnssec_bypass" ? "btn btn-warning btn-sm" : "btn btn-secondary btn-sm";
+
+  if (input) {
+    if (tab === "dnssec_bypass") {
+      input.placeholder = "e.g. *.telegram.org, telegram.org, or domain.com";
+    } else {
+      input.placeholder = "domain.com, *.wildcard, or ||adguard.rule^";
+    }
+  }
+
+  if (submitBtn) {
+    submitBtn.textContent = tab === "dnssec_bypass" ? "+ Add DNSSEC Bypass" : "+ Add Rule";
+  }
+
   renderRules(allCachedRules);
 }
 
@@ -157,7 +175,8 @@ function renderRules(rules) {
   const currentTabRules = allCachedRules.filter(r => r.rule_type === activeRuleTab);
 
   if (countBadge) {
-    countBadge.textContent = `${currentTabRules.length} ${activeRuleTab === 'whitelist' ? 'Allowed' : 'Blocked'}`;
+    const label = activeRuleTab === 'whitelist' ? 'Allowed' : (activeRuleTab === 'blacklist' ? 'Blocked' : 'DNSSEC Bypassed');
+    countBadge.textContent = `${currentTabRules.length} ${label}`;
   }
 
   let filtered = currentTabRules;
@@ -169,24 +188,29 @@ function renderRules(rules) {
   }
 
   if (filtered.length === 0) {
+    const tabName = activeRuleTab === 'dnssec_bypass' ? 'DNSSEC bypass' : activeRuleTab;
     const msg = ruleSearchFilter
-      ? `No ${activeRuleTab} rules matching "${ruleSearchFilter}".`
-      : `No custom ${activeRuleTab} rules added yet.`;
+      ? `No ${tabName} rules matching "${ruleSearchFilter}".`
+      : `No custom ${tabName} rules added yet.`;
     tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 24px;">${msg}</td></tr>`;
     return;
   }
 
   const isWhitelist = activeRuleTab === "whitelist";
+  const isDnssecBypass = activeRuleTab === "dnssec_bypass";
 
   tbody.innerHTML = filtered.map(r => {
     const target = r.id != null ? r.id : r.domain;
     const safeTarget = escapeHtml(target);
     const safeDomain = escapeHtml(r.domain);
     const safeComment = escapeHtml(r.comment || "");
-    const typeColor = isWhitelist ? "var(--accent-green)" : "var(--accent-red)";
-    const typeBadge = isWhitelist
-      ? `<span class="pill" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); font-size: 0.72rem;">Whitelist</span>`
-      : `<span class="pill" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-red); font-size: 0.72rem;">Blacklist</span>`;
+    const typeColor = isDnssecBypass ? "#f59e0b" : (isWhitelist ? "var(--accent-green)" : "var(--accent-red)");
+    const typeIcon = isDnssecBypass ? "🛡️" : (isWhitelist ? "🟢" : "🔴");
+    const typeBadge = isDnssecBypass
+      ? `<span class="pill" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 0.72rem;">DNSSEC Bypass</span>`
+      : (isWhitelist
+        ? `<span class="pill" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); font-size: 0.72rem;">Whitelist</span>`
+        : `<span class="pill" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-red); font-size: 0.72rem;">Blacklist</span>`);
 
     let scopeBadge = `<span style="color: var(--text-dim); font-size: 0.75rem;">Exact</span>`;
     if (r.is_wildcard) {
@@ -205,7 +229,7 @@ function renderRules(rules) {
         <td class="mobile-only">
           <div class="rule-card-top">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;">
-              <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
+              <span style="font-size: 0.8rem;">${typeIcon}</span>
               <code class="rule-domain-code" style="color: ${typeColor};">${safeDomain}</code>
               ${scopeBadge}
             </div>
@@ -219,7 +243,7 @@ function renderRules(rules) {
         <!-- DESKTOP VIEW -->
         <td class="desktop-only">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="font-size: 0.8rem;">${isWhitelist ? '🟢' : '🔴'}</span>
+            <span style="font-size: 0.8rem;">${typeIcon}</span>
             <code style="font-family: monospace; font-size: 0.84rem; font-weight: 600; color: ${typeColor}; word-break: break-all;">
               ${safeDomain}
             </code>

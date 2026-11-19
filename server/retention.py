@@ -24,6 +24,11 @@ def prune_old_logs(days: int = None) -> int:
         pass
 
     conn.commit()
+    # Checkpoint WAL pages after pruning to prevent runaway WAL file growth
+    try:
+        cursor.execute("PRAGMA wal_checkpoint(PASSIVE);")
+    except Exception:
+        pass
     conn.close()
     print(f"[Retention] Pruned {deleted_count} log entries older than {days} days")
     return deleted_count
